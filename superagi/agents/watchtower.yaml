@@ -1,0 +1,3 @@
+name: WatchtowerAgent
+description: Monitors consumer lag and errors
+entrypoint: http://localhost:8006/health

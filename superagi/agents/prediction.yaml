@@ -1,0 +1,3 @@
+name: PredictionAgent
+description: Consumes market.engineered and produces predictions.tft
+entrypoint: http://localhost:8003/health

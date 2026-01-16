@@ -1,0 +1,10 @@
+kafka:
+  bootstrap_servers: ["localhost:9092"]
+  schema_registry_url: "http://localhost:8081"
+  auto_offset_reset: "earliest"
+  group_ids:
+    feature_engineering: "feature-engineering"
+    prediction: "prediction"
+    risk: "risk"
+    execution: "execution"
+    watchtower: "watchtower"

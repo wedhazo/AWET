@@ -1,0 +1,80 @@
+# SuperAGI Configuration for AWET Trading Pipeline
+# This config integrates SuperAGI with the deterministic execution layer
+
+#####################------------------SYSTEM KEYS-------------------------###########
+
+# Encryption key (must be exactly 32 bytes)
+ENCRYPTION_KEY: "a14c6d7b0bf06b100fbafc28fc35ABCD"
+
+# LLM Provider Configuration
+OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-dummy}
+PALM_API_KEY: ""
+REPLICATE_API_TOKEN: ""
+HUGGING_API_TOKEN: ""
+
+# Local LLM via Ollama (GPU-accelerated on host, reachable from Docker containers)
+OPENAI_API_BASE: http://host.docker.internal:11434/v1
+MODEL_NAME: "llama3.2:3b"
+RESOURCES_SUMMARY_MODEL_NAME: "llama3.2:3b"
+MAX_TOOL_TOKEN_LIMIT: 800
+MAX_MODEL_TOKEN_LIMIT: 4032
+
+# Database (SuperAGI internal)
+DB_NAME: superagi
+DB_HOST: superagi-postgres
+DB_USERNAME: superagi
+DB_PASSWORD: superagi
+DB_URL: postgresql://superagi:superagi@superagi-postgres:5432/superagi
+REDIS_URL: "superagi-redis:6379"
+
+# Storage
+STORAGE_TYPE: "FILE"
+TOOLS_DIR: "superagi/tools"
+RESOURCES_INPUT_ROOT_DIR: workspace/input/{agent_id}
+RESOURCES_OUTPUT_ROOT_DIR: workspace/output/{agent_id}/{agent_execution_id}
+
+# Auth
+ENV: 'DEV'
+JWT_SECRET_KEY: 'awet-superagi-secret-2026'
+
+#####################------------------AWET INTEGRATION-----------------------###########
+
+# AWET Pipeline connections
+AWET_KAFKA_BOOTSTRAP: kafka:29092
+AWET_SCHEMA_REGISTRY: http://schema-registry:8081
+AWET_TIMESCALE_HOST: timescaledb
+AWET_TIMESCALE_PORT: 5432
+AWET_TIMESCALE_USER: awet
+AWET_TIMESCALE_PASSWORD: awet
+AWET_TIMESCALE_DB: awet
+
+# Local LLM for AWET tools (generate_plan, explain_run)
+# These tools use LM Studio on the host machine via llm_gateway
+AWET_LLM_BASE_URL: http://localhost:11434/v1
+AWET_LLM_MODEL: llama-3.1-70b-instruct-q4_k_m
+
+# Agent Settings  
+AGENT_MEMORY_STORAGE: postgres
+MAX_ITERATIONS: 25
+LOG_LEVEL: INFO
+
+# Tool Permissions - Only allow AWET deterministic tools + LLM tools
+ENABLED_TOOLS:
+  - awet_read_directive
+  - awet_run_backfill
+  - awet_train_model
+  - awet_promote_model
+  - awet_approve_execution
+  - awet_revoke_execution
+  - awet_run_demo
+  - awet_check_pipeline_health
+  - awet_query_audit_trail
+  - awet_check_kafka_lag
+  - awet_generate_plan
+  - awet_explain_run
+
+# Safety: Disable tools that could cause non-deterministic behavior
+DISABLED_TOOLS:
+  - code_execution
+  - shell_command
+  - web_scraper

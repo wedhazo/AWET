@@ -1,0 +1,7 @@
+MARKET_RAW = "market.raw"
+MARKET_ENGINEERED = "market.engineered"
+PREDICTIONS_TFT = "predictions.tft"
+RISK_APPROVED = "risk.approved"
+RISK_REJECTED = "risk.rejected"
+EXECUTION_COMPLETED = "execution.completed"
+EXECUTION_BLOCKED = "execution.blocked"

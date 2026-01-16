@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awet-feature-engineering
+  namespace: awet
+  labels:
+    app.kubernetes.io/name: awet-feature-engineering
+    app.kubernetes.io/component: features
+    app.kubernetes.io/part-of: awet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: awet-feature-engineering
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: awet-feature-engineering
+        app.kubernetes.io/component: features
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: awet
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: feature-engineering
+          image: ghcr.io/OWNER/awet/feature-engineering:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "src.agents.feature_engineering"]
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: awet-config
+            - secretRef:
+                name: awet-secrets
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: awet-app-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: awet-feature-engineering
+  namespace: awet
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: http
+      name: http
+  selector:
+    app.kubernetes.io/name: awet-feature-engineering

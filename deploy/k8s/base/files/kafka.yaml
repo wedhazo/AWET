@@ -1,0 +1,5 @@
+bootstrap_servers: kafka-headless.awet.svc.cluster.local:9092
+schema_registry_url: http://schema-registry.awet.svc.cluster.local:8081
+consumer_group_prefix: awet
+auto_offset_reset: earliest
+enable_auto_commit: false

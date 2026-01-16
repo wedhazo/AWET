@@ -1,0 +1,64 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: awet
+
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - secrets.yaml
+  - data-ingestion.yaml
+  - feature-engineering.yaml
+  - prediction.yaml
+  - risk.yaml
+  - execution.yaml
+  - watchtower.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: awet-trading-platform
+      app.kubernetes.io/managed-by: kustomize
+
+# ConfigMap as generator so overlays can override
+configMapGenerator:
+  - name: awet-config
+    literals:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-headless.awet.svc.cluster.local:9092
+      - SCHEMA_REGISTRY_URL=http://schema-registry.awet.svc.cluster.local:8081
+      - TIMESCALE_HOST=timescaledb.awet.svc.cluster.local
+      - TIMESCALE_PORT=5432
+      - TIMESCALE_DB=awet
+      - REDIS_HOST=redis.awet.svc.cluster.local
+      - REDIS_PORT=6379
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      - ENVIRONMENT=production
+      - TRADING_MODE=paper
+      - MAX_POSITION_SIZE=10000
+      - MAX_DAILY_LOSS=1000
+      - MODEL_PATH=/models/tft_model.onnx
+      - PREDICTION_HORIZON=5
+  - name: awet-app-config
+    files:
+      - files/app.yaml
+      - files/kafka.yaml
+      - files/market_data.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+# Images can be overridden per environment
+images:
+  - name: ghcr.io/OWNER/awet/data-ingestion
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/feature-engineering
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/prediction
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/risk
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/execution
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/watchtower
+    newTag: latest
+

@@ -1,0 +1,246 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - awet
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    container_name: schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    networks:
+      - awet
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+      - schema-registry
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: awet
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+    networks:
+      - awet
+
+  timescaledb:
+    image: timescale/timescaledb:2.13.1-pg15
+    container_name: timescaledb
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DB=awet
+      - POSTGRES_USER=awet
+      - POSTGRES_PASSWORD=awet
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - awet
+
+  redis:
+    image: redis:7.2
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - awet
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - awet
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - awet
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/config.yml:/etc/alertmanager/config.yml:ro
+    networks:
+      - awet
+
+  # ============================================
+  # SuperAGI - Autonomous AI Agent Orchestrator
+  # ============================================
+  superagi-backend:
+    build:
+      context: ./superagi
+      dockerfile: Dockerfile
+    container_name: superagi-backend
+    depends_on:
+      - superagi-redis
+      - superagi-postgres
+      - kafka
+      - timescaledb
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-ollama-local}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - POSTGRES_USER=superagi
+      - POSTGRES_PASSWORD=superagi
+      - POSTGRES_DB=superagi
+      - POSTGRES_HOST=superagi-postgres
+      - REDIS_HOST=superagi-redis
+      - REDIS_PORT=6379
+      # AWET Pipeline connections
+      - AWET_KAFKA_BOOTSTRAP=kafka:29092
+      - AWET_SCHEMA_REGISTRY=http://schema-registry:8081
+      - AWET_TIMESCALE_HOST=timescaledb
+      - AWET_TIMESCALE_PORT=5432
+      - AWET_TIMESCALE_USER=awet
+      - AWET_TIMESCALE_PASSWORD=awet
+      - AWET_TIMESCALE_DB=awet
+      # Local LLM config - Ollama on host with GPU acceleration
+      - LLM_BASE_URL=http://host.docker.internal:11434/v1
+      - LLM_MODEL=llama3.2:3b
+      # OpenAI API base - points to host Ollama for GPU-accelerated inference
+      - OPENAI_API_BASE=http://host.docker.internal:11434/v1
+    volumes:
+      - ./superagi/workspace:/app/workspace
+      - ./execution:/app/awet_tools/execution:ro
+      - ./directives:/app/awet_tools/directives:ro
+      - ./config:/app/awet_tools/config:ro
+      - ./src:/app/awet_tools/src:ro
+      - ./.tmp:/app/awet_tools/.tmp
+      # Ollama compatibility patch for OpenAI SDK
+      - ./superagi/patches/openai_ollama_compat.py:/app/superagi/llms/openai.py:ro
+    ports:
+      - "8100:8001"
+    networks:
+      - awet
+    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+
+  superagi-celery:
+    build:
+      context: ./superagi
+      dockerfile: Dockerfile
+    container_name: superagi-celery
+    depends_on:
+      - superagi-redis
+      - superagi-postgres
+      - superagi-backend
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-ollama-local}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - POSTGRES_USER=superagi
+      - POSTGRES_PASSWORD=superagi
+      - POSTGRES_DB=superagi
+      - POSTGRES_HOST=superagi-postgres
+      - REDIS_HOST=superagi-redis
+      - REDIS_PORT=6379
+      - AWET_KAFKA_BOOTSTRAP=kafka:29092
+      - AWET_SCHEMA_REGISTRY=http://schema-registry:8081
+      - AWET_TIMESCALE_HOST=timescaledb
+      - AWET_TIMESCALE_PORT=5432
+      # OpenAI API base - points to host Ollama for GPU-accelerated inference
+      - OPENAI_API_BASE=http://host.docker.internal:11434/v1
+    volumes:
+      - ./superagi/workspace:/app/workspace
+      - ./execution:/app/awet_tools/execution:ro
+      - ./directives:/app/awet_tools/directives:ro
+      - ./.tmp:/app/awet_tools/.tmp
+      # Ollama compatibility patch for OpenAI SDK
+      - ./superagi/patches/openai_ollama_compat.py:/app/superagi/llms/openai.py:ro
+    networks:
+      - awet
+    command: ["celery", "-A", "superagi.worker", "worker", "--loglevel=info"]
+
+  superagi-gui:
+    build:
+      context: ./superagi/gui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: "/api"
+    container_name: superagi-gui
+    depends_on:
+      - superagi-backend
+    networks:
+      - awet
+
+  superagi-proxy:
+    image: nginx:stable-alpine
+    container_name: superagi-proxy
+    ports:
+      - "3001:80"
+    depends_on:
+      - superagi-backend
+      - superagi-gui
+    volumes:
+      - ./superagi/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - awet
+
+  superagi-redis:
+    image: redis/redis-stack-server:latest
+    container_name: superagi-redis
+    volumes:
+      - superagi_redis_data:/data
+    networks:
+      - awet
+
+  superagi-postgres:
+    image: postgres:15
+    container_name: superagi-postgres
+    environment:
+      - POSTGRES_USER=superagi
+      - POSTGRES_PASSWORD=superagi
+      - POSTGRES_DB=superagi
+    volumes:
+      - superagi_postgres_data:/var/lib/postgresql/data/
+    networks:
+      - awet
+
+networks:
+  awet:
+    driver: bridge
+
+volumes:
+  superagi_postgres_data:
+  superagi_redis_data:

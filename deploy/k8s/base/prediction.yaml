@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awet-prediction
+  namespace: awet
+  labels:
+    app.kubernetes.io/name: awet-prediction
+    app.kubernetes.io/component: prediction
+    app.kubernetes.io/part-of: awet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: awet-prediction
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: awet-prediction
+        app.kubernetes.io/component: prediction
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: awet
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: prediction
+          image: ghcr.io/OWNER/awet/prediction:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "src.agents.prediction"]
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: awet-config
+            - secretRef:
+                name: awet-secrets
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: models
+              mountPath: /models
+              readOnly: true
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: awet-app-config
+        - name: models
+          persistentVolumeClaim:
+            claimName: awet-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: awet-prediction
+  namespace: awet
+  labels:
+    app.kubernetes.io/name: awet-prediction
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: awet-prediction
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: awet-models
+  namespace: awet
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard

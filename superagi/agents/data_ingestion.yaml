@@ -1,0 +1,3 @@
+name: DataIngestionAgent
+description: Produces market.raw events
+entrypoint: http://localhost:8001/health

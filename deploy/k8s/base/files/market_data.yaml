@@ -1,0 +1,9 @@
+provider: yfinance
+timeframe: 1D
+symbols:
+  - AAPL
+  - MSFT
+  - GOOGL
+  - AMZN
+  - NVDA
+backfill_days: 30

@@ -1,0 +1,8 @@
+provider: local
+base_url: "http://localhost:11434/v1"
+model: "llama3.2:1b"
+timeout_seconds: 180
+max_tokens: 4096
+temperature: 0.2
+top_p: 0.9
+concurrency_limit: 4

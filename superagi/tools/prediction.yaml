@@ -1,0 +1,3 @@
+name: trigger_prediction
+method: GET
+url: http://localhost:8003/health

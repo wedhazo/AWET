@@ -1,0 +1,3 @@
+name: RiskAgent
+description: Consumes predictions.tft and produces risk.approved/rejected
+entrypoint: http://localhost:8004/health

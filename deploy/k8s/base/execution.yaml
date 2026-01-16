@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awet-execution
+  namespace: awet
+  labels:
+    app.kubernetes.io/name: awet-execution
+    app.kubernetes.io/component: execution
+    app.kubernetes.io/part-of: awet
+spec:
+  # CRITICAL: Only ONE replica for execution to prevent duplicate trades
+  replicas: 1
+  strategy:
+    type: Recreate  # No rolling update - only one instance at a time
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: awet-execution
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: awet-execution
+        app.kubernetes.io/component: execution
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: awet
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: execution
+          image: ghcr.io/OWNER/awet/execution:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "src.agents.execution"]
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            # PAPER TRADING ONLY - enforced at application level
+            - name: TRADING_MODE
+              value: "paper"
+            - name: REQUIRE_APPROVAL
+              value: "true"
+          envFrom:
+            - configMapRef:
+                name: awet-config
+            - secretRef:
+                name: awet-secrets
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: approval-token
+              mountPath: /app/approval
+              readOnly: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: awet-app-config
+        - name: approval-token
+          secret:
+            secretName: awet-execution-approval
+            optional: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: awet-execution
+  namespace: awet
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: http
+      name: http
+  selector:
+    app.kubernetes.io/name: awet-execution
+---
+# Execution approval token - must be created manually to enable trading
+apiVersion: v1
+kind: Secret
+metadata:
+  name: awet-execution-approval
+  namespace: awet
+  annotations:
+    description: "Create this secret to enable execution agent. Delete to disable."
+type: Opaque
+stringData:
+  # Token format: APPROVE_EXECUTION_<YYYYMMDD>
+  # Must be rotated daily for safety
+  approval_token: ""

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: awet
+  labels:
+    app.kubernetes.io/name: awet
+    app.kubernetes.io/part-of: awet-trading-platform

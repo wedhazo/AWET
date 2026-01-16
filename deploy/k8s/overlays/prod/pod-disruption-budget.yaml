@@ -1,0 +1,31 @@
+# Pod Disruption Budgets for production stability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: awet-prediction-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: awet-prediction
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: awet-feature-engineering-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: awet-feature-engineering
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: awet-data-ingestion-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: awet-data-ingestion
+

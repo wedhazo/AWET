@@ -1,0 +1,78 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: awet-dev
+
+resources:
+  - ../../base
+
+labels:
+  - pairs:
+      environment: dev
+
+# Override namespace
+patches:
+  - patch: |
+      - op: replace
+        path: /metadata/name
+        value: awet-dev
+    target:
+      kind: Namespace
+      name: awet
+  # Reduce prediction resources for dev
+  - patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+    target:
+      kind: Deployment
+      name: awet-prediction
+  # Reduce feature-engineering resources for dev
+  - patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "250m"
+            memory: "512Mi"
+    target:
+      kind: Deployment
+      name: awet-feature-engineering
+
+# Use develop branch images
+images:
+  - name: ghcr.io/OWNER/awet/data-ingestion
+    newTag: develop
+  - name: ghcr.io/OWNER/awet/feature-engineering
+    newTag: develop
+  - name: ghcr.io/OWNER/awet/prediction
+    newTag: develop
+  - name: ghcr.io/OWNER/awet/risk
+    newTag: develop
+  - name: ghcr.io/OWNER/awet/execution
+    newTag: develop
+  - name: ghcr.io/OWNER/awet/watchtower
+    newTag: develop
+
+# Override config for dev environment
+configMapGenerator:
+  - name: awet-config
+    behavior: merge
+    literals:
+      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=development
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+
+

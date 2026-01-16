@@ -1,0 +1,88 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: awet-prod
+
+resources:
+  - ../../base
+  - pod-disruption-budget.yaml
+
+labels:
+  - pairs:
+      environment: production
+
+# Patches using JSON patch format
+patches:
+  - patch: |
+      - op: replace
+        path: /metadata/name
+        value: awet-prod
+    target:
+      kind: Namespace
+      name: awet
+  # Increase replicas for HA in production
+  - patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: awet-data-ingestion
+  - patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: awet-feature-engineering
+  - patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: awet-prediction
+  - patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: awet-risk
+  - patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: awet-watchtower
+  # EXECUTION MUST REMAIN SINGLE REPLICA - prevent duplicate trades
+
+# Use latest (main branch) images
+images:
+  - name: ghcr.io/OWNER/awet/data-ingestion
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/feature-engineering
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/prediction
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/risk
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/execution
+    newTag: latest
+  - name: ghcr.io/OWNER/awet/watchtower
+    newTag: latest
+
+# Override config for prod environment (defaults are fine, just setting explicitly)
+configMapGenerator:
+  - name: awet-config
+    behavior: merge
+    literals:
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+
+

@@ -1,0 +1,9 @@
+[Unit]
+Description=AWET Ops Scheduler Timer
+
+[Timer]
+OnCalendar=*-*-* 09:20:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

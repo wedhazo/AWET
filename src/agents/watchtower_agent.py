@@ -34,20 +34,22 @@ class WatchtowerAgent(BaseAgent):
         return self._admin_client
 
     async def start(self) -> None:
-        asyncio.create_task(self._monitor_loop())
-        asyncio.create_task(self._lag_monitor_loop())
+        self.track_task(asyncio.create_task(self._monitor_loop()))
+        self.track_task(asyncio.create_task(self._lag_monitor_loop()))
 
     async def _monitor_loop(self) -> None:
         """Heartbeat monitor."""
-        while True:
+        while not self.is_shutting_down:
             EVENTS_PROCESSED.labels(agent=self.name, event_type="heartbeat").inc()
             await asyncio.sleep(5)
 
     async def _lag_monitor_loop(self) -> None:
         """Poll Kafka consumer lag every 30 seconds."""
-        while True:
+        while not self.is_shutting_down:
             try:
                 await self._update_consumer_lag()
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 logger.error("lag_monitor_error", error=str(e))
             await asyncio.sleep(30)

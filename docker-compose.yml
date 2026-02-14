@@ -2,6 +2,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka
+    restart: unless-stopped
     ports:
       - "9092:9092"
       - "9101:9101"
@@ -20,23 +21,49 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - awet
 
   schema-registry:
     image: confluentinc/cp-schema-registry:7.6.1
     container_name: schema-registry
+    restart: unless-stopped
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     ports:
       - "8081:8081"
     environment:
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - awet
 
@@ -58,52 +85,109 @@ services:
   timescaledb:
     image: timescale/timescaledb:2.13.1-pg15
     container_name: timescaledb
+    restart: unless-stopped
     ports:
       - "5433:5432"
     environment:
       - POSTGRES_DB=awet
       - POSTGRES_USER=awet
-      - POSTGRES_PASSWORD=awet
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-awet}
     volumes:
+      - timescaledb_data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U awet -d awet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - awet
 
   redis:
     image: redis:7.2
     container_name: redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - awet
 
   prometheus:
     image: prom/prometheus:v2.54.1
     container_name: prometheus
+    restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - awet
 
   grafana:
     image: grafana/grafana:11.1.0
     container_name: grafana
+    restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - awet
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
     container_name: alertmanager
+    restart: unless-stopped
     ports:
       - "9093:9093"
     volumes:
       - ./alertmanager/config.yml:/etc/alertmanager/config.yml:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - awet
 
@@ -237,10 +321,77 @@ services:
     networks:
       - awet
 
+  # ============================================
+  # AWET Automated Reconciliation & PnL
+  # ============================================
+  
+  # Continuous order reconciliation during market hours
+  awet-reconciler:
+    image: python:3.11-slim
+    container_name: awet-reconciler
+    depends_on:
+      - timescaledb
+      - kafka
+      - schema-registry
+    environment:
+      - DATABASE_URL=postgresql://awet:awet@timescaledb:5432/awet
+      - ALPACA_API_KEY=${ALPACA_API_KEY:-}
+      - ALPACA_API_SECRET=${ALPACA_API_SECRET:-}
+      - ALPACA_PAPER=${ALPACA_PAPER:-true}
+      - PYTHONUNBUFFERED=1
+      - TZ=America/New_York
+    volumes:
+      - .:/app:ro
+      - ./logs:/app/logs
+    working_dir: /app
+    command: >
+      bash -c "pip install -q asyncpg structlog httpx pytz &&
+               python scripts/reconcile_scheduler.py --watch"
+    restart: unless-stopped
+    networks:
+      - awet
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # End-of-day job (manual trigger or scheduled)
+  awet-eod:
+    image: python:3.11-slim
+    container_name: awet-eod
+    depends_on:
+      - timescaledb
+      - kafka
+      - schema-registry
+    environment:
+      - DATABASE_URL=postgresql://awet:awet@timescaledb:5432/awet
+      - ALPACA_API_KEY=${ALPACA_API_KEY:-}
+      - ALPACA_API_SECRET=${ALPACA_API_SECRET:-}
+      - ALPACA_PAPER=${ALPACA_PAPER:-true}
+      - PYTHONUNBUFFERED=1
+      - TZ=America/New_York
+    volumes:
+      - .:/app:ro
+      - ./logs:/app/logs
+    working_dir: /app
+    command: >
+      bash -c "pip install -q asyncpg structlog httpx pytz &&
+               python scripts/reconcile_scheduler.py --eod"
+    profiles:
+      - eod
+    networks:
+      - awet
+
 networks:
   awet:
     driver: bridge
 
 volumes:
+  kafka_data:
+  timescaledb_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
   superagi_postgres_data:
   superagi_redis_data:

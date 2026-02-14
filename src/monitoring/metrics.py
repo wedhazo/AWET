@@ -87,6 +87,32 @@ LIVE_INGESTION_FAILURES = Counter(
     registry=REGISTRY,
 )
 
+# Reconciliation / portfolio metrics
+RECONCILE_ERRORS = Counter(
+    "reconcile_errors_total",
+    "Total reconciliation errors",
+    ["type"],
+    registry=REGISTRY,
+)
+
+PENDING_ORDERS = Gauge(
+    "pending_orders",
+    "Number of pending orders",
+    registry=REGISTRY,
+)
+
+OPEN_POSITIONS = Gauge(
+    "open_positions",
+    "Number of open positions",
+    registry=REGISTRY,
+)
+
+PORTFOLIO_VALUE = Gauge(
+    "portfolio_value_usd",
+    "Total portfolio market value (USD)",
+    registry=REGISTRY,
+)
+
 
 def metrics_response() -> Response:
     return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)

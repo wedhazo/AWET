@@ -70,12 +70,13 @@ class DataIngestionAgent(BaseAgent):
         await self.audit.connect()
         if self._use_real_data:
             self._provider = self._create_provider()
-            asyncio.create_task(self._backfill())
-        asyncio.create_task(self._produce_loop())
+            self.track_task(asyncio.create_task(self._backfill()))
+        self.track_task(asyncio.create_task(self._produce_loop()))
 
     async def _shutdown(self) -> None:
         if self._provider:
             await self._provider.close()
+        self.producer.close()
         await self.audit.close()
 
     async def _backfill(self) -> None:
@@ -181,13 +182,20 @@ class DataIngestionAgent(BaseAgent):
         """Main loop: poll real data or generate stubs."""
         await self.audit.connect()
         md_cfg = self.settings.market_data
-        while True:
+        while not self.is_shutting_down:
+          try:
             if self._use_real_data:
                 await self._poll_real_data()
                 await asyncio.sleep(md_cfg.polling_interval_seconds)
             else:
                 await self._generate_stub_data()
                 await asyncio.sleep(1)
+          except asyncio.CancelledError:
+              self.logger.info("produce_loop_cancelled")
+              break
+          except Exception:
+              self.logger.exception("produce_loop_error")
+              await asyncio.sleep(1.0)
 
 
 def main() -> None:

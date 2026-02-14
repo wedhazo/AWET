@@ -7,9 +7,11 @@ model registry to load the current "green" model.
 
 from __future__ import annotations
 
+import json
 import os
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -48,14 +50,24 @@ class InferenceBuffer:
 
 
 class ONNXInferenceEngine:
-    """ONNX-based inference engine for TFT model with registry integration."""
+    """ONNX-based inference engine for TFT model with registry integration.
 
-    FEATURE_ORDER = [
+    Supports dynamic feature lists loaded from ``feature_meta.json``
+    saved alongside the ONNX model during training.  When the metadata
+    file is present the engine uses its ``feature_columns`` list;
+    otherwise it falls back to the default 15-feature baseline.
+    """
+
+    # Default 15-feature baseline — used when feature_meta.json is absent
+    DEFAULT_FEATURE_ORDER = [
         "price", "volume", "returns_1", "returns_5", "returns_15",
         "volatility_5", "volatility_15", "sma_5", "sma_20",
         "ema_5", "ema_20", "rsi_14", "volume_zscore",
         "minute_of_day", "day_of_week",
     ]
+
+    # Kept for backward compat — callers that reference FEATURE_ORDER directly
+    FEATURE_ORDER = DEFAULT_FEATURE_ORDER
     
     # Output layout: 9 quantiles (3 horizons × 3 quantiles) + 1 confidence
     HORIZONS = [30, 45, 60]
@@ -80,6 +92,9 @@ class ONNXInferenceEngine:
         self._buffers: dict[str, InferenceBuffer] = {}
         self._loaded = False
         self._model_version: str | None = None
+        # Dynamic feature metadata — populated from feature_meta.json
+        self._feature_order: list[str] = list(self.DEFAULT_FEATURE_ORDER)
+        self._feature_meta: dict[str, Any] | None = None
     
     def _resolve_model_path(self) -> str | None:
         """Resolve model path from registry or explicit path."""
@@ -99,7 +114,13 @@ class ONNXInferenceEngine:
         return os.getenv("ONNX_MODEL_PATH", "models/tft/model.onnx")
 
     def load_model(self) -> bool:
-        """Load ONNX model from registry or explicit path."""
+        """Load ONNX model from registry or explicit path.
+
+        After loading the ONNX session this method also attempts to
+        load ``feature_meta.json`` from the same directory.  If found
+        the engine switches to the feature list stored by training,
+        which may contain more than the default 15 features.
+        """
         self.model_path = self._resolve_model_path()
         
         if not self.model_path or not os.path.exists(self.model_path):
@@ -126,17 +147,57 @@ class ONNXInferenceEngine:
                 self.lookback_window = input_info.shape[1]
                 logger.info("auto_detected_lookback", lookback=self.lookback_window)
             
+            # Load dynamic feature metadata if available
+            self._load_feature_meta()
+            
             logger.info(
                 "onnx_model_loaded",
                 path=self.model_path,
                 providers=providers,
                 version=self._model_version,
                 lookback=self.lookback_window,
+                num_features=len(self._feature_order),
+                feature_source="feature_meta.json" if self._feature_meta else "default",
             )
             return True
         except Exception as e:
             logger.error("onnx_load_error", error=str(e))
             return False
+
+    def _load_feature_meta(self) -> None:
+        """Load feature_meta.json from the model directory.
+
+        If the file exists the engine uses its ``feature_columns`` list
+        for feature extraction.  This allows models trained with
+        extended feature sets (Reddit sentiment, calendar, market
+        benchmark, etc.) to work without code changes.
+        """
+        if not self.model_path:
+            return
+        model_dir = Path(self.model_path).parent
+        meta_path = model_dir / "feature_meta.json"
+        if not meta_path.exists():
+            logger.debug("feature_meta_not_found", dir=str(model_dir))
+            return
+        try:
+            with open(meta_path) as f:
+                meta = json.load(f)
+            feature_cols = meta.get("feature_columns")
+            if not feature_cols or not isinstance(feature_cols, list):
+                logger.warning("feature_meta_invalid", path=str(meta_path))
+                return
+            self._feature_meta = meta
+            self._feature_order = feature_cols
+            # Update instance-level FEATURE_ORDER for callers that read it
+            self.FEATURE_ORDER = feature_cols  # type: ignore[assignment]
+            logger.info(
+                "feature_meta_loaded",
+                path=str(meta_path),
+                num_features=len(feature_cols),
+                sample=feature_cols[:5],
+            )
+        except Exception as e:
+            logger.warning("feature_meta_load_error", error=str(e))
     
     def reload_if_needed(self) -> bool:
         """Reload model if registry has a new green model."""
@@ -160,10 +221,25 @@ class ONNXInferenceEngine:
             self._buffers[symbol] = InferenceBuffer(symbol=symbol)
         return self._buffers[symbol]
 
+    @property
+    def feature_columns(self) -> list[str]:
+        """Return the active feature column list."""
+        return list(self._feature_order)
+
+    @property
+    def num_features(self) -> int:
+        """Number of features expected by the loaded model."""
+        return len(self._feature_order)
+
     def extract_features(self, event_data: dict[str, Any]) -> list[float]:
-        """Extract feature vector from event data."""
+        """Extract feature vector from event data.
+
+        Uses the dynamic ``_feature_order`` list which is either loaded
+        from ``feature_meta.json`` or falls back to the default 15
+        features.  Missing keys default to ``0.0``.
+        """
         features = []
-        for col in self.FEATURE_ORDER:
+        for col in self._feature_order:
             val = event_data.get(col, 0.0)
             features.append(float(val) if val is not None else 0.0)
         return features

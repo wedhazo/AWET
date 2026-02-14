@@ -1,0 +1,39 @@
+                            Table "public.features_tft"
+     Column      |           Type           | Collation | Nullable |    Default    
+-----------------+--------------------------+-----------+----------+---------------
+ ticker          | text                     |           | not null | 
+ ts              | timestamp with time zone |           | not null | 
+ time_idx        | integer                  |           | not null | 
+ split           | text                     |           | not null | 'train'::text
+ price           | numeric(18,6)            |           | not null | 
+ open            | numeric(18,6)            |           |          | 
+ high            | numeric(18,6)            |           |          | 
+ low             | numeric(18,6)            |           |          | 
+ close           | numeric(18,6)            |           |          | 
+ volume          | numeric(18,2)            |           |          | 
+ returns_1       | numeric(12,8)            |           |          | 
+ returns_5       | numeric(12,8)            |           |          | 
+ returns_15      | numeric(12,8)            |           |          | 
+ target_return   | numeric(12,8)            |           |          | 
+ volatility_5    | numeric(12,8)            |           |          | 
+ volatility_15   | numeric(12,8)            |           |          | 
+ sma_5           | numeric(18,6)            |           |          | 
+ sma_20          | numeric(18,6)            |           |          | 
+ ema_5           | numeric(18,6)            |           |          | 
+ ema_20          | numeric(18,6)            |           |          | 
+ rsi_14          | numeric(8,4)             |           |          | 
+ volume_zscore   | numeric(10,6)            |           |          | 
+ minute_of_day   | integer                  |           |          | 
+ hour_of_day     | integer                  |           |          | 
+ day_of_week     | integer                  |           |          | 
+ idempotency_key | text                     |           | not null | 
+ created_at      | timestamp with time zone |           | not null | now()
+Indexes:
+    "features_tft_pkey" PRIMARY KEY, btree (ts, ticker)
+    "features_tft_split_idx" btree (split)
+    "features_tft_ticker_idx" btree (ticker, ts DESC)
+    "features_tft_ts_idx" btree (ts DESC)
+Triggers:
+    ts_insert_blocker BEFORE INSERT ON features_tft FOR EACH ROW EXECUTE FUNCTION _timescaledb_functions.insert_blocker()
+Number of child tables: 6 (Use \d+ to list them.)
+

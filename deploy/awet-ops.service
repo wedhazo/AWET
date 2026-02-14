@@ -1,0 +1,15 @@
+[Unit]
+Description=AWET Ops Scheduler (reconcile orders/positions)
+After=network.target
+
+[Service]
+Type=simple
+User=kironix
+WorkingDirectory=/home/kironix/Awet
+EnvironmentFile=/home/kironix/Awet/.env
+ExecStart=/home/kironix/Awet/.venv/bin/python /home/kironix/Awet/scripts/reconcile_scheduler.py --watch
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

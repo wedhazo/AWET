@@ -13,6 +13,11 @@
     {"name": "status", "type": "string"},
     {"name": "filled_qty", "type": "int"},
     {"name": "avg_price", "type": "double"},
-    {"name": "paper_trade", "type": "boolean"}
+    {"name": "paper_trade", "type": "boolean"},
+    {"name": "dry_run", "type": "boolean", "default": false},
+    {"name": "side", "type": "string", "default": "buy"},
+    {"name": "alpaca_order_id", "type": ["null", "string"], "default": null},
+    {"name": "alpaca_status", "type": ["null", "string"], "default": null},
+    {"name": "error_message", "type": ["null", "string"], "default": null}
   ]
 }

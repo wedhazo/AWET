@@ -1,4 +1,12 @@
-"""TFT training pipeline with MLflow tracking and ONNX export."""
+"""TFT training pipeline with MLflow tracking and ONNX export.
+
+.. deprecated::
+    This training script uses the legacy ``TemporalFusionTransformer``
+    from ``src/ml/tft_model.py``.  The canonical training pipeline is
+    ``scripts/train_tft_baseline.py`` which trains ``SimpleTFTModel``,
+    exports to ONNX, saves ``feature_meta.json``, and registers in
+    the model registry.  Use that instead.
+"""
 
 from __future__ import annotations
 

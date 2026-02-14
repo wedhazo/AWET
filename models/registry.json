@@ -38,6 +38,60 @@
       },
       "promoted_at": "2026-01-15T08:15:35.764313+00:00",
       "deprecated_at": null
+    },
+    {
+      "run_id": "20260117_035006_ab98e94b",
+      "created_at": "2026-01-17T03:50:19.239675+00:00",
+      "path": "models/tft/20260117_035006_ab98e94b",
+      "status": "candidate",
+      "metrics": {
+        "val_loss": 8.765568638252193e-06,
+        "train_loss": 1.2645561484790013e-05,
+        "epochs": 14
+      },
+      "hyperparams": {
+        "hidden_size": 32,
+        "attention_heads": 2,
+        "seq_length": 60,
+        "batch_size": 256,
+        "learning_rate": 0.001
+      }
+    },
+    {
+      "run_id": "20260117_065324_885653e7",
+      "created_at": "2026-01-17T06:53:35.658750+00:00",
+      "path": "models/tft/20260117_065324_885653e7",
+      "status": "candidate",
+      "metrics": {
+        "val_loss": 8.843691563315704e-06,
+        "train_loss": 1.2814511745828249e-05,
+        "epochs": 12
+      },
+      "hyperparams": {
+        "hidden_size": 32,
+        "attention_heads": 2,
+        "seq_length": 60,
+        "batch_size": 256,
+        "learning_rate": 0.001
+      }
+    },
+    {
+      "run_id": "20260121_172948_2630a2df",
+      "created_at": "2026-01-21T17:29:50.826469+00:00",
+      "path": "models/tft/20260121_172948_2630a2df",
+      "status": "candidate",
+      "metrics": {
+        "val_loss": 0.0040995879098773,
+        "train_loss": 0.006249424535781145,
+        "epochs": 5
+      },
+      "hyperparams": {
+        "hidden_size": 32,
+        "attention_heads": 2,
+        "seq_length": 5,
+        "batch_size": 256,
+        "learning_rate": 0.001
+      }
     }
   ]
 }

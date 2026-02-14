@@ -12,7 +12,7 @@ import structlog
 from prometheus_client import Counter, Histogram
 
 from src.core.config import load_settings
-from src.core.logging import get_correlation_id
+from src.core.logging import get_correlation_id, set_correlation_id
 from src.llm.client import LLMClient
 from src.monitoring.metrics import REGISTRY
 
@@ -46,12 +46,16 @@ SYSTEM_PROMPT = (
 
 async def generate_plan(directive_name: str, context: dict[str, Any]) -> str:
     settings = load_settings()
-    client = LLMClient(settings.llm)
+    client = LLMClient(settings.llm, agent_name="Orchestrator:generate_plan")
     root = Path(__file__).resolve().parents[2]
     directive_path = root / "directives" / f"{directive_name}.md"
     directive_text = directive_path.read_text(encoding="utf-8")
+    
+    # Get or extract correlation_id and BIND it to context
     correlation_id = str(context.get("correlation_id")) if "correlation_id" in context else None
     correlation_id = correlation_id or get_correlation_id()
+    if correlation_id:
+        set_correlation_id(correlation_id)
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -84,7 +88,11 @@ async def generate_plan(directive_name: str, context: dict[str, Any]) -> str:
 
 async def explain_run(correlation_id: str) -> str:
     settings = load_settings()
-    client = LLMClient(settings.llm)
+    client = LLMClient(settings.llm, agent_name="Orchestrator:explain_run")
+    
+    # Bind correlation_id to context so LLMClient can pick it up
+    set_correlation_id(correlation_id)
+    
     events = await _fetch_audit_trail(correlation_id)
 
     messages = [

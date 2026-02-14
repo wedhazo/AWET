@@ -1,5 +1,12 @@
 """Temporal Fusion Transformer (TFT) model implementation.
 
+.. deprecated::
+    This is a legacy TFT model only used by ``src/ml/train_tft.py``.
+    The canonical training pipeline is ``scripts/train_tft_baseline.py``
+    which trains ``SimpleTFTModel``, exports to ONNX, saves
+    ``feature_meta.json``, and registers in the model registry.
+    Production inference uses ``ONNXInferenceEngine`` (``src/ml/onnx_engine.py``).
+
 A simplified TFT architecture for time series forecasting with
 quantile outputs.
 """

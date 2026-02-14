@@ -17,6 +17,12 @@ class AppHttpConfig(BaseModel):
     risk_port: int
     execution_port: int
     watchtower_port: int
+    orchestrator_port: int
+    night_trainer_port: int
+    morning_deployer_port: int
+    trade_watchdog_port: int
+    backtester_port: int
+    health_report_port: int
 
 
 class AppConfig(BaseModel):
@@ -24,7 +30,33 @@ class AppConfig(BaseModel):
     correlation_header: str
     http: AppHttpConfig
     execution_approval_file: str
+    execution_default_qty: int = 1      # Default quantity for paper trades
+    execution_dry_run: bool = True      # Safety: when True, ALL trades blocked
+    # Trading logic parameters
+    max_trade_notional_usd: float = 1000.0  # Max USD per trade
+    max_qty_per_trade: int = 100            # Max shares per trade
+    min_qty_per_trade: int = 1              # Min shares per trade
+    check_position_before_sell: bool = True  # Check position before SELL
+    use_bracket_orders: bool = False
+    take_profit_pct: float = 0.03
+    stop_loss_pct: float = 0.015
+    allow_add_to_position: bool = False
+    max_orders_per_minute: int = 5
+    max_orders_per_symbol_per_day: int = 3
+    max_open_orders_total: int = 20
+    cooldown_seconds_per_symbol: int = 900
+    max_total_exposure_usd: float = 50000.0
+    max_exposure_per_symbol_usd: float = 10000.0
+    max_holding_minutes: int = 60
+    exit_check_interval_seconds: int = 60
     symbols: list[str]
+
+
+class TraderDecisionAgentConfig(BaseModel):
+    port: int = 8011
+    min_confidence: float = 0.65
+    buy_return_threshold: float = 0.005
+    sell_return_threshold: float = 0.005
 
 
 class KafkaGroupIds(BaseModel):
@@ -33,6 +65,12 @@ class KafkaGroupIds(BaseModel):
     risk: str
     execution: str
     watchtower: str
+    trader_decision: str
+
+
+class KafkaTopics(BaseModel):
+    predictions_tft: str = "predictions.tft"
+    trade_decisions: str = "trade.decisions"
 
 
 class KafkaConfig(BaseModel):
@@ -40,6 +78,7 @@ class KafkaConfig(BaseModel):
     schema_registry_url: str
     auto_offset_reset: str
     group_ids: KafkaGroupIds
+    topics: KafkaTopics
 
 
 class LimitsConfig(BaseModel):
@@ -123,10 +162,16 @@ class LLMConfig(BaseModel):
     temperature: float = 0.2
     top_p: float = 0.9
     concurrency_limit: int = 4
+    # LLM Tracing settings
+    trace_enabled: bool = True
+    trace_preview_chars: int = 800
+    trace_log_level: str = "INFO"
+    trace_store_db: bool = True
 
 
 class Settings(BaseModel):
     app: AppConfig
+    trader_decision_agent: TraderDecisionAgentConfig = Field(default_factory=TraderDecisionAgentConfig)
     kafka: KafkaConfig
     limits: LimitsConfig
     logging: LoggingConfig
@@ -179,7 +224,33 @@ def _apply_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_settings(config_dir: str = "config") -> Settings:
-    load_dotenv()
+    # Load .env from repo root (handles relative paths)
+    from pathlib import Path
+    
+    # Try multiple paths for .env
+    env_paths = [
+        Path.cwd() / ".env",
+        Path(__file__).parent.parent.parent / ".env",
+    ]
+    
+    env_loaded = False
+    for env_path in env_paths:
+        if env_path.exists():
+            load_dotenv(env_path)
+            env_loaded = True
+            break
+    
+    if not env_loaded:
+        import sys
+        print(
+            "⚠️  WARNING: No .env file found. "
+            "Alpaca credentials may not be available.",
+            file=sys.stderr,
+        )
+    
+    # Check for critical Alpaca vars and warn if missing
+    _check_alpaca_env()
+    
     base = {}
     base.update(_load_yaml(Path(config_dir) / "app.yaml"))
     base.update(_load_yaml(Path(config_dir) / "kafka.yaml"))
@@ -189,3 +260,30 @@ def load_settings(config_dir: str = "config") -> Settings:
     base.update(_load_yaml(Path(config_dir) / "llm.yaml"))
     merged = _apply_env_overrides(base)
     return Settings.model_validate(merged)
+
+
+def _check_alpaca_env() -> None:
+    """Check for Alpaca environment variables and warn if missing."""
+    import sys
+    
+    missing = []
+    if not os.getenv("ALPACA_API_KEY"):
+        missing.append("ALPACA_API_KEY")
+    if not os.getenv("ALPACA_SECRET_KEY"):
+        missing.append("ALPACA_SECRET_KEY")
+    
+    if missing:
+        print(
+            f"⚠️  WARNING: Missing Alpaca credentials: {', '.join(missing)}. "
+            "Paper trading will use simulated orders.",
+            file=sys.stderr,
+        )
+    
+    # Warn if using live endpoint
+    base_url = os.getenv("ALPACA_BASE_URL", "")
+    if base_url and "paper-api" not in base_url and "api.alpaca.markets" in base_url:
+        print(
+            f"🚨 DANGER: ALPACA_BASE_URL appears to be a LIVE endpoint: {base_url}. "
+            "AlpacaClient will refuse to start.",
+            file=sys.stderr,
+        )

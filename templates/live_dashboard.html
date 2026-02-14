@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWET Live Streaming Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+        
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            background: linear-gradient(45deg, #00ff88, #0088ff, #ff0088);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .live-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff4444;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            animation: pulse 2s infinite;
+        }
+        
+        .live-indicator.connected {
+            background: #44ff44;
+        }
+        
+        .top-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .metric-card h3 {
+            font-size: 0.8em;
+            opacity: 0.8;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .metric-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .portfolio-flow {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .portfolio-flow h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00ff88;
+        }
+        
+        .stocks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stock-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .stock-card:hover {
+            border-color: #00ff88;
+            box-shadow: 0 8px 32px rgba(0, 255, 136, 0.2);
+        }
+        
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .stock-symbol {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #00ff88;
+        }
+        
+        .stock-price {
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        
+        .stock-change {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        
+        .change-amount {
+            font-size: 0.9em;
+        }
+        
+        .change-percent {
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .positive { color: #00ff88; }
+        .negative { color: #ff4444; }
+        
+        .mini-chart {
+            height: 150px;
+            margin-top: 10px;
+        }
+        
+        .positions-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .section-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #0088ff;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        table th, table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        table th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        
+        .status-bar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #888;
+        }
+        
+        @media (max-width: 768px) {
+            .stocks-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .top-metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>📡 AWET Live Streaming</h1>
+            <div class="subtitle">Real-Time TOP 20 American Stocks + Portfolio Flow</div>
+            <div class="live-indicator" id="connection-status">🔴 CONNECTING...</div>
+        </div>
+        
+        <div class="top-metrics">
+            <div class="metric-card">
+                <h3>Portfolio Value</h3>
+                <div class="value" id="portfolio-value">$0.00</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Total P&L</h3>
+                <div class="value" id="total-pnl">$0.00</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Active Positions</h3>
+                <div class="value" id="position-count">0</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Live Stocks</h3>
+                <div class="value" id="live-count">0</div>
+            </div>
+        </div>
+        
+        <div class="portfolio-flow">
+            <h2>📈 Portfolio Value & P&L Live Flow</h2>
+            <div id="portfolio-flow-chart">
+                <div class="loading">Loading portfolio flow chart...</div>
+            </div>
+        </div>
+        
+        <div class="section-title">🇺🇸 TOP 20 American Stocks - Live Streaming</div>
+        <div class="stocks-grid" id="stocks-grid">
+            <div class="loading">Loading live stock data...</div>
+        </div>
+        
+        <div class="positions-section" id="positions-section">
+            <div class="section-title">💼 Your Active Positions</div>
+            <table id="positions-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Quantity</th>
+                        <th>Avg Price</th>
+                        <th>Current Price</th>
+                        <th>Market Value</th>
+                        <th>P&L</th>
+                        <th>P&L %</th>
+                    </tr>
+                </thead>
+                <tbody id="positions-body">
+                    <tr>
+                        <td colspan="7" class="loading">Loading positions...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="status-bar">
+        <span class="pulse" id="pulse-indicator">⚫</span> 
+        <span id="status-text">Initializing...</span>
+    </div>
+    
+    <script>
+        // Socket.IO connection
+        const socket = io();
+        let isConnected = false;
+        let updateCount = 0;
+        
+        // Helper functions
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(value);
+        }
+        
+        function formatPercent(value) {
+            return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+        }
+        
+        // Socket events
+        socket.on('connect', function() {
+            isConnected = true;
+            document.getElementById('connection-status').textContent = '🟢 LIVE';
+            document.getElementById('connection-status').className = 'live-indicator connected';
+            document.getElementById('pulse-indicator').textContent = '🟢';
+            document.getElementById('status-text').textContent = 'Connected - Streaming Live';
+            console.log('Connected to AWET Live Stream');
+        });
+        
+        socket.on('disconnect', function() {
+            isConnected = false;
+            document.getElementById('connection-status').textContent = '🔴 DISCONNECTED';
+            document.getElementById('connection-status').className = 'live-indicator';
+            document.getElementById('pulse-indicator').textContent = '🔴';
+            document.getElementById('status-text').textContent = 'Reconnecting...';
+        });
+        
+        socket.on('live_update', function(data) {
+            updateCount++;
+            updateDashboard(data);
+            document.getElementById('status-text').textContent = `Live Update #${updateCount} - ${new Date().toLocaleTimeString()}`;
+        });
+        
+        function updateDashboard(data) {
+            // Update top metrics
+            if (data.portfolio) {
+                document.getElementById('portfolio-value').textContent = formatCurrency(data.portfolio.portfolio_value || 0);
+                
+                const totalPnl = data.portfolio.total_pnl || 0;
+                const pnlElement = document.getElementById('total-pnl');
+                pnlElement.textContent = formatCurrency(totalPnl);
+                pnlElement.className = `value ${totalPnl >= 0 ? 'positive' : 'negative'}`;
+                
+                document.getElementById('position-count').textContent = data.portfolio.active_positions ? data.portfolio.active_positions.length : 0;
+            }
+            
+            document.getElementById('live-count').textContent = data.update_count || 0;
+            
+            // Update stocks grid
+            updateStocksGrid(data.top20_prices || {});
+            
+            // Update positions table
+            updatePositionsTable(data.portfolio ? data.portfolio.active_positions : []);
+            
+            // Update portfolio flow chart
+            updatePortfolioFlowChart();
+        }
+        
+        function updateStocksGrid(prices) {
+            const grid = document.getElementById('stocks-grid');
+            
+            if (Object.keys(prices).length === 0) {
+                grid.innerHTML = '<div class="loading">No live data available</div>';
+                return;
+            }
+            
+            const stockCards = Object.entries(prices).map(([symbol, data]) => {
+                const changeClass = data.change >= 0 ? 'positive' : 'negative';
+                const changeSign = data.change >= 0 ? '+' : '';
+                
+                return `
+                    <div class="stock-card" data-symbol="${symbol}">
+                        <div class="stock-header">
+                            <div class="stock-symbol">${symbol}</div>
+                            <div class="stock-price">${formatCurrency(data.price)}</div>
+                        </div>
+                        <div class="stock-change">
+                            <div class="change-amount ${changeClass}">
+                                ${changeSign}${formatCurrency(data.change)}
+                            </div>
+                            <div class="change-percent ${changeClass}">
+                                ${formatPercent(data.change_pct)}
+                            </div>
+                        </div>
+                        <div class="mini-chart" id="chart-${symbol}">
+                            <div style="text-align: center; padding: 20px; font-size: 0.8em; color: #888;">
+                                📈 Live chart loading...
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            grid.innerHTML = stockCards;
+            
+            // Load mini charts for each stock
+            Object.keys(prices).forEach(symbol => {
+                loadMiniChart(symbol);
+            });
+        }
+        
+        function updatePositionsTable(positions) {
+            const tbody = document.getElementById('positions-body');
+            
+            if (!positions || positions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No active positions</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = positions.map(pos => `
+                <tr>
+                    <td><strong>${pos.symbol}</strong></td>
+                    <td>${pos.quantity.toFixed(2)}</td>
+                    <td>${formatCurrency(pos.avg_price)}</td>
+                    <td>${formatCurrency(pos.current_price)}</td>
+                    <td>${formatCurrency(pos.market_value)}</td>
+                    <td class="${pos.pnl >= 0 ? 'positive' : 'negative'}">${formatCurrency(pos.pnl)}</td>
+                    <td class="${pos.pnl_pct >= 0 ? 'positive' : 'negative'}">${formatPercent(pos.pnl_pct)}</td>
+                </tr>
+            `).join('');
+        }
+        
+        async function loadMiniChart(symbol) {
+            try {
+                const response = await fetch(`/api/chart/${symbol}`);
+                const chartData = await response.json();
+                
+                if (Object.keys(chartData).length > 0) {
+                    Plotly.newPlot(`chart-${symbol}`, chartData.data, chartData.layout, {
+                        responsive: true,
+                        displayModeBar: false
+                    });
+                }
+            } catch (error) {
+                console.error(`Failed to load chart for ${symbol}:`, error);
+            }
+        }
+        
+        async function updatePortfolioFlowChart() {
+            try {
+                const response = await fetch('/api/portfolio_flow');
+                const chartData = await response.json();
+                
+                if (Object.keys(chartData).length > 0) {
+                    Plotly.newPlot('portfolio-flow-chart', chartData.data, chartData.layout, {
+                        responsive: true,
+                        displayModeBar: false
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load portfolio flow chart:', error);
+            }
+        }
+        
+        // Initial data request
+        socket.emit('request_data');
+        
+        // Periodic chart updates
+        setInterval(() => {
+            updatePortfolioFlowChart();
+        }, 60000); // Update portfolio chart every minute
+    </script>
+</body>
+</html>

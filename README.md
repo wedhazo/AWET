@@ -94,6 +94,41 @@ You can add the startup script to `@reboot` in cron if you want auto-start after
 @reboot cd /home/kironix/Awet && ./scripts/awet_start.sh >> logs/startup.log 2>&1
 ```
 
+### Log Locations
+
+| Log File | Description |
+|----------|-------------|
+| `logs/startup.log` | System startup output |
+| `logs/night_trainer.log` | Nightly backfill and training |
+| `logs/morning_deployer.log` | Morning health checks |
+| `logs/trade_watchdog.log` | Market-hours monitoring |
+
+```bash
+# Watch all logs in real-time
+tail -f logs/*.log
+```
+
+### Paper Trading Safety
+
+The system is **paper-trading only** with multiple safety gates:
+
+1. **Alpaca endpoint** — `.env` hardcoded to `https://paper-api.alpaca.markets`
+2. **Approval gate** — ExecutionAgent requires `.tmp/APPROVE_EXECUTION` file to process trades
+3. **No broker client** — No order submission code exists; trades are simulated locally
+
+```bash
+# Enable paper trading
+make approve
+
+# Disable (block all trades)
+make revoke
+
+# Check status
+ls .tmp/APPROVE_EXECUTION 2>/dev/null && echo "APPROVED" || echo "BLOCKED"
+```
+
+See [OPERATIONS.md](OPERATIONS.md#8-paper-trading-safety) for full safety architecture details.
+
 ## 📋 Prerequisites
 
 - **Python 3.11+**

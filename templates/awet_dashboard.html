@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWET Trading Platform — Full Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0e17;--bg2:#111827;--bg3:#1a2236;--bg4:#232d44;
+  --border:#2a3550;--border2:#3b4a6b;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --accent:#3b82f6;--accent2:#60a5fa;
+  --green:#10b981;--green2:#34d399;--green-bg:rgba(16,185,129,.12);
+  --red:#ef4444;--red2:#f87171;--red-bg:rgba(239,68,68,.12);
+  --yellow:#f59e0b;--yellow2:#fbbf24;--yellow-bg:rgba(245,158,11,.12);
+  --purple:#8b5cf6;--purple2:#a78bfa;
+  --cyan:#06b6d4;--cyan2:#22d3ee;
+  --orange:#f97316;--orange2:#fb923c;
+  --pink:#ec4899;
+  --radius:12px;--radius-sm:8px;
+  --shadow:0 4px 24px rgba(0,0,0,.35);
+  --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','Fira Code','Cascadia Code','Consolas',monospace;
+}
+html{font-size:14px;scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+a{color:var(--accent2);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Layout */
+.app{display:flex;min-height:100vh}
+.sidebar{
+  width:250px;background:var(--bg2);border-right:1px solid var(--border);
+  position:fixed;top:0;left:0;bottom:0;overflow-y:auto;z-index:100;
+  display:flex;flex-direction:column;
+}
+.main{margin-left:250px;flex:1;padding:24px 32px;max-width:1500px}
+
+/* Sidebar */
+.sidebar .logo{padding:20px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sidebar .logo .icon{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff}
+.sidebar .logo h1{font-size:1.1rem;font-weight:700;letter-spacing:-.5px}
+.sidebar .logo small{font-size:.68rem;color:var(--text3);display:block;margin-top:1px}
+.sidebar nav{flex:1;padding:8px 0}
+.sidebar nav .section-label{padding:14px 16px 4px;font-size:.62rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);font-weight:600}
+.sidebar nav a{display:flex;align-items:center;gap:9px;padding:7px 16px;font-size:.82rem;color:var(--text2);transition:all .15s;border-left:3px solid transparent;cursor:pointer}
+.sidebar nav a:hover{background:var(--bg3);color:var(--text);text-decoration:none}
+.sidebar nav a.active{background:rgba(59,130,246,.08);color:var(--accent2);border-left-color:var(--accent);font-weight:600}
+.sidebar nav a .ni{width:18px;text-align:center;font-size:.9rem}
+.sidebar .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:.68rem;color:var(--text3)}
+
+/* Topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.topbar h2{font-size:1.4rem;font-weight:700;letter-spacing:-.5px}
+.topbar .meta{display:flex;align-items:center;gap:12px;font-size:.78rem;color:var(--text2)}
+.btn{padding:6px 14px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--bg3);color:var(--text);cursor:pointer;font-size:.78rem;transition:all .15s;font-family:var(--font)}
+.btn:hover{background:var(--bg4);border-color:var(--accent)}
+
+/* Cards grid */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;transition:border-color .2s}
+.card:hover{border-color:var(--border2)}
+.card .card-label{font-size:.68rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px}
+.card .card-value{font-size:1.5rem;font-weight:700;letter-spacing:-1px}
+.card .card-sub{font-size:.74rem;color:var(--text2);margin-top:3px}
+.card-accent{border-left:3px solid var(--accent)}
+.card-green{border-left:3px solid var(--green)}
+.card-yellow{border-left:3px solid var(--yellow)}
+.card-purple{border-left:3px solid var(--purple)}
+.card-red{border-left:3px solid var(--red)}
+.card-cyan{border-left:3px solid var(--cyan)}
+.card-orange{border-left:3px solid var(--orange)}
+.card-pink{border-left:3px solid var(--pink)}
+
+/* Section panel */
+.section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:20px;overflow:hidden}
+.section-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.section-header h3{font-size:.95rem;font-weight:600}
+.section-body{padding:16px 18px}
+
+/* Badges */
+.badge{padding:2px 8px;border-radius:16px;font-size:.68rem;font-weight:600;display:inline-block}
+.badge-up{background:var(--green-bg);color:var(--green2)}
+.badge-down{background:var(--red-bg);color:var(--red2)}
+.badge-warn{background:var(--yellow-bg);color:var(--yellow2)}
+.badge-info{background:rgba(59,130,246,.12);color:var(--accent2)}
+.badge-purple{background:rgba(139,92,246,.12);color:var(--purple2)}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+.status-dot.up{background:var(--green)}
+.status-dot.down{background:var(--red)}
+
+/* Data table */
+.data-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.data-table th{text-align:left;padding:8px 12px;font-size:.66rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);border-bottom:1px solid var(--border);font-weight:600}
+.data-table td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(255,255,255,.02)}
+.mono{font-family:var(--mono);font-size:.78rem}
+
+/* Pipeline */
+.pipeline-flow{display:flex;align-items:center;gap:0;overflow-x:auto;padding:8px 0}
+.pipeline-stage{flex:0 0 auto;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;min-width:140px;text-align:center}
+.pipeline-stage .stage-num{font-size:.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.pipeline-stage .stage-name{font-weight:600;font-size:.82rem;margin-bottom:3px}
+.pipeline-stage .stage-topic{font-family:var(--mono);font-size:.68rem;color:var(--accent2)}
+.pipeline-arrow{flex:0 0 auto;color:var(--text3);font-size:1.1rem;padding:0 3px}
+
+/* Model card */
+.model-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:10px}
+.model-card.green-model{border-left:3px solid var(--green)}
+.model-card.candidate-model{border-left:3px solid var(--yellow)}
+.model-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px}
+.model-header .model-id{font-family:var(--mono);font-size:.78rem;font-weight:600}
+.model-metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.model-metric{background:var(--bg2);padding:7px 10px;border-radius:6px}
+.model-metric .label{font-size:.6rem;text-transform:uppercase;color:var(--text3);letter-spacing:.5px}
+.model-metric .value{font-family:var(--mono);font-size:.82rem;font-weight:600;margin-top:1px}
+
+/* Config grid */
+.config-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.config-item{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+.config-item .key{font-size:.78rem;color:var(--text2)}
+.config-item .val{font-family:var(--mono);font-size:.82rem;font-weight:600}
+
+/* Schema accordion */
+.schema-toggle{cursor:pointer;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;font-size:.82rem;font-weight:500;transition:background .15s}
+.schema-toggle:hover{background:var(--bg4)}
+.schema-toggle .arrow{transition:transform .2s;font-size:.75rem}
+.schema-toggle.open .arrow{transform:rotate(90deg)}
+.schema-content{display:none;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);margin-top:-7px;margin-bottom:6px}
+.schema-content.open{display:block}
+.schema-field{display:flex;gap:10px;padding:3px 0;font-size:.78rem;border-bottom:1px solid rgba(255,255,255,.04)}
+.schema-field:last-child{border-bottom:none}
+.schema-field .fname{font-family:var(--mono);color:var(--accent2);min-width:180px}
+.schema-field .ftype{color:var(--text3);font-family:var(--mono);font-size:.74rem;min-width:100px}
+.schema-field .fdefault{color:var(--text3);font-family:var(--mono);font-size:.72rem}
+
+/* DB table item */
+.db-table-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.db-table-item:last-child{border-bottom:none}
+.db-table-item .tname{font-family:var(--mono);font-size:.82rem}
+.db-table-item .trows{font-family:var(--mono);font-size:.78rem;color:var(--text2);background:var(--bg3);padding:2px 8px;border-radius:4px}
+
+/* Alert rule card */
+.alert-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:8px}
+.alert-card .alert-name{font-weight:600;font-size:.88rem;margin-bottom:4px}
+.alert-card .alert-expr{font-family:var(--mono);font-size:.72rem;color:var(--cyan2);background:var(--bg);padding:6px 10px;border-radius:6px;margin:6px 0;white-space:pre-wrap;word-break:break-all}
+.alert-card .alert-meta{font-size:.74rem;color:var(--text2);margin-top:4px}
+
+/* Directive card */
+.directive-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:10px;cursor:pointer;transition:border-color .15s}
+.directive-card:hover{border-color:var(--accent)}
+.directive-content{display:none;font-family:var(--mono);font-size:.74rem;color:var(--text2);background:var(--bg);padding:10px 14px;border-radius:var(--radius-sm);margin-top:8px;white-space:pre-wrap;max-height:400px;overflow-y:auto;line-height:1.5}
+.directive-content.open{display:block}
+
+/* Docker service */
+.docker-svc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:8px}
+
+/* Commit list */
+.commit-list{list-style:none}
+.commit-list li{padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--mono);font-size:.78rem;color:var(--text2)}
+.commit-list li:last-child{border-bottom:none}
+.commit-hash{color:var(--yellow2);margin-right:6px}
+
+/* Dep tag */
+.dep-tag{display:inline-block;padding:3px 8px;margin:2px;border-radius:4px;font-family:var(--mono);font-size:.72rem;background:var(--bg3);border:1px solid var(--border)}
+.dep-tag.core{border-color:var(--accent);color:var(--accent2)}
+.dep-tag.ml{border-color:var(--purple);color:var(--purple2)}
+.dep-tag.dev{border-color:var(--yellow);color:var(--yellow2)}
+
+/* Loading */
+.loading{text-align:center;padding:30px;color:var(--text3)}
+.loading .spinner{display:inline-block;width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Feature table */
+.feature-cat{font-size:.7rem;text-transform:uppercase;color:var(--text3);letter-spacing:.5px;padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px}
+.feature-cat:first-child{border-top:none;margin-top:0}
+
+/* Safety gate */
+.safety-gate{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px}
+.safety-icon{font-size:1.3rem;min-width:30px;text-align:center}
+.safety-label{font-weight:600;font-size:.88rem}
+.safety-status{font-family:var(--mono);font-size:.82rem;margin-left:auto}
+
+/* Responsive */
+@media(max-width:1024px){.sidebar{width:210px}.main{margin-left:210px;padding:18px}}
+@media(max-width:768px){.sidebar{display:none}.main{margin-left:0}.cards{grid-template-columns:repeat(2,1fr)}.pipeline-flow{flex-wrap:wrap}}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* Tab bar */
+.tabs{display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0}
+.tab{padding:8px 16px;font-size:.8rem;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2);transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent2);border-bottom-color:var(--accent);font-weight:600}
+.tab-content{display:none}.tab-content.active{display:block}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="icon">A</div>
+      <div><h1>AWET</h1><small>Trading Platform v0.1</small></div>
+    </div>
+    <nav>
+      <div class="section-label">Overview</div>
+      <a class="active" onclick="showPage('overview',this)"><span class="ni">📊</span> Dashboard</a>
+      <a onclick="showPage('pipeline',this)"><span class="ni">⚡</span> Pipeline</a>
+      <a onclick="showPage('safety',this)"><span class="ni">🔒</span> Safety Gates</a>
+      <div class="section-label">Infrastructure</div>
+      <a onclick="showPage('infra',this)"><span class="ni">🏗️</span> Services</a>
+      <a onclick="showPage('docker',this)"><span class="ni">🐳</span> Docker</a>
+      <a onclick="showPage('alerts',this)"><span class="ni">🔔</span> Alert Rules</a>
+      <a onclick="showPage('metrics',this)"><span class="ni">📈</span> Metrics</a>
+      <div class="section-label">Intelligence</div>
+      <a onclick="showPage('models',this)"><span class="ni">🧠</span> ML Models</a>
+      <a onclick="showPage('features',this)"><span class="ni">🔬</span> Features</a>
+      <a onclick="showPage('kafka',this)"><span class="ni">📨</span> Kafka Schemas</a>
+      <a onclick="showPage('database',this)"><span class="ni">🗄️</span> Database</a>
+      <div class="section-label">Operations</div>
+      <a onclick="showPage('config',this)"><span class="ni">⚙️</span> Config</a>
+      <a onclick="showPage('universe',this)"><span class="ni">🌎</span> Universe</a>
+      <a onclick="showPage('directives',this)"><span class="ni">📋</span> Directives</a>
+      <a onclick="showPage('makefile',this)"><span class="ni">🔧</span> Make Targets</a>
+      <a onclick="showPage('deps',this)"><span class="ni">📦</span> Dependencies</a>
+      <a onclick="showPage('codebase',this)"><span class="ni">📁</span> Codebase</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div>Paper Trading Only · v0.1.0</div>
+      <div id="sidebar-time" style="margin-top:3px"></div>
+    </div>
+  </aside>
+
+  <div class="main">
+
+    <!-- 1. OVERVIEW -->
+    <div id="page-overview" class="page">
+      <div class="topbar"><h2>Dashboard Overview</h2><div class="meta"><span id="env-badge"></span><span id="safety-badge"></span><button class="btn" onclick="loadAll()">↻ Refresh All</button></div></div>
+      <div class="cards" id="overview-cards"><div class="loading"><div class="spinner"></div></div></div>
+      <div class="section"><div class="section-header"><h3>🤖 Agent Status</h3><span class="badge badge-info" id="agents-count"></span></div><div class="section-body" id="agents-body"><div class="loading"><div class="spinner"></div></div></div></div>
+      <div class="section"><div class="section-header"><h3>🏗️ Infrastructure</h3><span class="badge badge-info" id="infra-count"></span></div><div class="section-body" id="infra-quick"><div class="loading"><div class="spinner"></div></div></div></div>
+    </div>
+
+    <!-- 2. PIPELINE -->
+    <div id="page-pipeline" class="page" style="display:none">
+      <div class="topbar"><h2>Pipeline Flow</h2></div>
+      <div class="section"><div class="section-header"><h3>⚡ Event-Driven Pipeline</h3></div><div class="section-body" id="pipeline-flow"></div></div>
+      <div class="section"><div class="section-header"><h3>📋 Stage Details</h3></div><div class="section-body" id="pipeline-details"></div></div>
+      <div class="section"><div class="section-header"><h3>🧩 Stage Features</h3></div><div class="section-body" id="pipeline-features"></div></div>
+    </div>
+
+    <!-- 3. SAFETY GATES -->
+    <div id="page-safety" class="page" style="display:none">
+      <div class="topbar"><h2>Execution Safety Gates</h2></div>
+      <div id="safety-body"></div>
+    </div>
+
+    <!-- 4. INFRASTRUCTURE -->
+    <div id="page-infra" class="page" style="display:none">
+      <div class="topbar"><h2>Infrastructure Services</h2></div>
+      <div class="cards" id="infra-cards"></div>
+    </div>
+
+    <!-- 5. DOCKER -->
+    <div id="page-docker" class="page" style="display:none">
+      <div class="topbar"><h2>Docker Compose Services</h2></div>
+      <div class="cards" id="docker-summary"></div>
+      <div class="section"><div class="section-header"><h3>🐳 All Services</h3></div><div class="section-body" id="docker-body"></div></div>
+      <div class="section"><div class="section-header"><h3>💾 Volumes &amp; Networks</h3></div><div class="section-body" id="docker-vols"></div></div>
+    </div>
+
+    <!-- 6. ALERT RULES -->
+    <div id="page-alerts" class="page" style="display:none">
+      <div class="topbar"><h2>Prometheus Alert Rules</h2></div>
+      <div id="alerts-body"></div>
+      <div class="section" style="margin-top:20px"><div class="section-header"><h3>📧 Alertmanager Config</h3></div><div class="section-body" id="alertmanager-body"></div></div>
+    </div>
+
+    <!-- 7. METRICS -->
+    <div id="page-metrics" class="page" style="display:none">
+      <div class="topbar"><h2>Prometheus Metrics</h2></div>
+      <div class="section"><div class="section-header"><h3>📈 Metric Definitions</h3></div><div class="section-body" id="metrics-body"></div></div>
+    </div>
+
+    <!-- 8. MODELS -->
+    <div id="page-models" class="page" style="display:none">
+      <div class="topbar"><h2>ML Model Registry</h2></div>
+      <div id="models-body"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- 9. FEATURES -->
+    <div id="page-features" class="page" style="display:none">
+      <div class="topbar"><h2>Feature Engineering</h2></div>
+      <div class="section"><div class="section-header"><h3>🔬 features_tft Table Columns</h3><span class="badge badge-info" id="feat-count"></span></div><div class="section-body" id="features-body"></div></div>
+    </div>
+
+    <!-- 10. KAFKA -->
+    <div id="page-kafka" class="page" style="display:none">
+      <div class="topbar"><h2>Kafka Topics &amp; Avro Schemas</h2></div>
+      <div id="kafka-body"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- 11. DATABASE -->
+    <div id="page-database" class="page" style="display:none">
+      <div class="topbar"><h2>Database (TimescaleDB)</h2></div>
+      <div class="cards" id="db-summary"></div>
+      <div class="tabs" id="db-tabs"></div>
+      <div id="db-tab-content"></div>
+      <div class="section"><div class="section-header"><h3>⏰ Retention Policies</h3></div><div class="section-body" id="db-retention"></div></div>
+      <div class="section"><div class="section-header"><h3>📇 Indexes</h3></div><div class="section-body" id="db-indexes"></div></div>
+    </div>
+
+    <!-- 12. CONFIG -->
+    <div id="page-config" class="page" style="display:none">
+      <div class="topbar"><h2>Configuration</h2></div>
+      <div class="section"><div class="section-header"><h3>🛡️ Risk Limits</h3></div><div class="section-body" id="risk-config"></div></div>
+      <div class="section"><div class="section-header"><h3>📐 Training Hyperparameters</h3></div><div class="section-body" id="training-config"></div></div>
+      <div class="section"><div class="section-header"><h3>🎯 Trader Decision Config</h3></div><div class="section-body" id="trader-config"></div></div>
+      <div class="section"><div class="section-header"><h3>📂 Data Paths</h3></div><div class="section-body" id="data-config"></div></div>
+      <div class="section"><div class="section-header"><h3>🤖 LLM Config</h3></div><div class="section-body" id="llm-config"></div></div>
+    </div>
+
+    <!-- 13. UNIVERSE -->
+    <div id="page-universe" class="page" style="display:none">
+      <div class="topbar"><h2>Trading Universe</h2></div>
+      <div class="section"><div class="section-header"><h3>🌎 Symbols</h3><span class="badge badge-info" id="universe-count"></span></div><div class="section-body" id="universe-body"></div></div>
+    </div>
+
+    <!-- 14. DIRECTIVES -->
+    <div id="page-directives" class="page" style="display:none">
+      <div class="topbar"><h2>Directives (SOPs)</h2></div>
+      <div id="directives-body"></div>
+    </div>
+
+    <!-- 15. MAKEFILE -->
+    <div id="page-makefile" class="page" style="display:none">
+      <div class="topbar"><h2>Makefile Targets</h2></div>
+      <div class="section"><div class="section-header"><h3>🔧 Available Commands</h3><span class="badge badge-info" id="make-count"></span></div><div class="section-body" id="make-body"></div></div>
+    </div>
+
+    <!-- 16. DEPENDENCIES -->
+    <div id="page-deps" class="page" style="display:none">
+      <div class="topbar"><h2>Project Dependencies</h2></div>
+      <div class="cards" id="deps-summary"></div>
+      <div class="section"><div class="section-header"><h3>📦 Core Dependencies</h3></div><div class="section-body" id="deps-core"></div></div>
+      <div class="section"><div class="section-header"><h3>🧠 ML Dependencies</h3></div><div class="section-body" id="deps-ml"></div></div>
+      <div class="section"><div class="section-header"><h3>🧪 Dev Dependencies</h3></div><div class="section-body" id="deps-dev"></div></div>
+    </div>
+
+    <!-- 17. CODEBASE -->
+    <div id="page-codebase" class="page" style="display:none">
+      <div class="topbar"><h2>Codebase &amp; Git</h2></div>
+      <div class="cards" id="code-cards"></div>
+      <div class="section"><div class="section-header"><h3>🔀 Git Status</h3></div><div class="section-body" id="git-body"></div></div>
+      <div class="section"><div class="section-header"><h3>📂 Source Tree</h3></div><div class="section-body" id="src-tree"></div></div>
+      <div class="section"><div class="section-header"><h3>🧪 Test Suite</h3></div><div class="section-body" id="tests-body"></div></div>
+      <div class="section"><div class="section-header"><h3>📝 Log Files</h3></div><div class="section-body" id="logs-body"></div></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  $('page-' + id).style.display = 'block';
+  document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+async function api(path) { try { const r = await fetch(path); return r.json(); } catch(e) { return { error: e.message }; } }
+function fmt(n) { return typeof n === 'number' ? n.toLocaleString() : (n ?? '—'); }
+function dot(s) { return `<span class="status-dot ${s}"></span>`; }
+function statusBadge(s) { return `<span class="badge ${s==='up'?'badge-up':'badge-down'}">${(s||'').toUpperCase()}</span>`; }
+function sevBadge(s) { return `<span class="badge ${s==='critical'?'badge-down':s==='warning'?'badge-warn':'badge-info'}">${s}</span>`; }
+
+// ── LOAD ALL ──
+async function loadAll() {
+  loadOverview(); loadAgents(); loadInfra(); loadPipeline(); loadSafety();
+  loadModels(); loadKafka(); loadDatabase(); loadConfig(); loadUniverse();
+  loadCodebase(); loadDocker(); loadAlerts(); loadMetrics(); loadDirectives();
+  loadMakefile(); loadDeps(); loadFeatures(); loadLogs(); loadSrcTree();
+}
+
+// ── 1. OVERVIEW ──
+async function loadOverview() {
+  const d = await api('/api/overview');
+  $('env-badge').innerHTML = `<span class="badge ${d.execution_dry_run?'badge-warn':'badge-up'}">${d.execution_dry_run?'🔒 DRY RUN':'🟢 PAPER TRADING'}</span>`;
+  $('safety-badge').innerHTML = `<span class="badge ${d.approval_file_exists?'badge-up':'badge-warn'}">${d.approval_file_exists?'✅ Approved':'⛔ Not Approved'}</span>`;
+  $('overview-cards').innerHTML = `
+    <div class="card card-accent"><div class="card-label">Environment</div><div class="card-value">${d.environment}</div><div class="card-sub">AWET v${d.version}</div></div>
+    <div class="card card-cyan"><div class="card-label">Symbols</div><div class="card-value">${d.num_symbols}</div><div class="card-sub">${(d.symbols||[]).join(', ')}</div></div>
+    <div class="card card-green"><div class="card-label">Green Model</div><div class="card-value">${d.models_green}</div><div class="card-sub mono">${d.green_model_id?d.green_model_id.substring(0,20)+'…':'None'}</div></div>
+    <div class="card card-yellow"><div class="card-label">Candidates</div><div class="card-value">${d.models_candidate}</div><div class="card-sub">${d.models_total} in registry</div></div>
+    <div class="card card-purple"><div class="card-label">Source Files</div><div class="card-value">${fmt(d.src_files)}</div><div class="card-sub">${fmt(d.src_lines)} lines</div></div>
+    <div class="card card-accent"><div class="card-label">Tests</div><div class="card-value">${d.test_files}</div><div class="card-sub">${d.script_files} scripts</div></div>
+    <div class="card card-orange"><div class="card-label">Execution</div><div class="card-value">${d.execution_files}</div><div class="card-sub">tool scripts</div></div>
+    <div class="card card-pink"><div class="card-label">Schemas</div><div class="card-value">${d.schema_files}</div><div class="card-sub">Avro .avsc files</div></div>
+    <div class="card card-cyan"><div class="card-label">Directives</div><div class="card-value">${d.directive_files}</div><div class="card-sub">SOP documents</div></div>`;
+}
+
+// ── 2. AGENTS ──
+async function loadAgents() {
+  const d = await api('/api/agents'); const a = d.agents; const names = Object.keys(a);
+  const up = names.filter(n=>a[n].status==='up').length;
+  $('agents-count').textContent = `${up}/${names.length} online`;
+  let h = '<table class="data-table"><thead><tr><th>Agent</th><th>Port</th><th>Status</th><th>Details</th></tr></thead><tbody>';
+  for (const n of names) { const ag = a[n]; const label = n.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    h += `<tr><td>${dot(ag.status)}${label}</td><td class="mono">:${ag.port}</td><td>${statusBadge(ag.status)}</td><td class="mono" style="font-size:.72rem;color:var(--text3)">${ag.error?ag.error.substring(0,60):ag.code||''}</td></tr>`; }
+  h += '</tbody></table>'; $('agents-body').innerHTML = h;
+}
+
+// ── 3. INFRASTRUCTURE ──
+async function loadInfra() {
+  const d = await api('/api/infrastructure'); const svcs = d.services; const names = Object.keys(svcs);
+  const up = names.filter(n=>svcs[n].status==='up').length;
+  let q = '<table class="data-table"><thead><tr><th>Service</th><th>Port</th><th>Image</th><th>Status</th></tr></thead><tbody>';
+  for (const n of names) { const s = svcs[n]; q += `<tr><td>${dot(s.status)}${s.display_name}</td><td class="mono">:${s.port}</td><td class="mono" style="font-size:.72rem;color:var(--text3)">${s.image}</td><td>${statusBadge(s.status)}</td></tr>`; }
+  q += '</tbody></table>'; $('infra-quick').innerHTML = q; $('infra-count').textContent = `${up}/${names.length} up`;
+  let cards = ''; for (const n of names) { const s = svcs[n]; cards += `<div class="card ${s.status==='up'?'card-green':'card-red'}"><div class="card-label">${s.display_name}</div><div class="card-value" style="font-size:1.2rem">${s.status==='up'?'● Online':'○ Offline'}</div><div class="card-sub mono">${s.host}:${s.port}</div><div class="card-sub" style="font-size:.68rem;color:var(--text3);margin-top:2px">${s.image}</div></div>`; }
+  $('infra-cards').innerHTML = cards;
+}
+
+// ── 4. PIPELINE ──
+async function loadPipeline() {
+  const d = await api('/api/pipeline'); const stages = d.stages;
+  const colors = ['var(--accent)','var(--cyan)','var(--purple)','var(--yellow)','var(--orange)','var(--green)','var(--pink)'];
+  let flow = '<div class="pipeline-flow">';
+  stages.forEach((s,i) => { flow += `<div class="pipeline-stage" style="border-top:3px solid ${colors[i%colors.length]}"><div class="stage-num">Stage ${s.id}</div><div class="stage-name">${s.name}</div><div class="stage-topic">${s.output}</div></div>`; if(i<stages.length-1) flow += '<div class="pipeline-arrow">→</div>'; });
+  flow += '</div>'; $('pipeline-flow').innerHTML = flow;
+  let det = '<table class="data-table"><thead><tr><th>#</th><th>Stage</th><th>Agent</th><th>Input</th><th>Output</th><th>Port</th><th>Source</th></tr></thead><tbody>';
+  for (const s of stages) det += `<tr><td>${s.id}</td><td style="font-weight:600">${s.name}</td><td class="mono">${s.agent}</td><td class="mono" style="color:var(--cyan2)">${s.input}</td><td class="mono" style="color:var(--green2)">${s.output}</td><td class="mono">:${s.port}</td><td class="mono" style="font-size:.7rem;color:var(--text3)">${s.source_file}</td></tr>`;
+  det += '</tbody></table>'; $('pipeline-details').innerHTML = det;
+  let feat = ''; for (const s of stages) { feat += `<div style="margin-bottom:12px"><div style="font-weight:600;font-size:.85rem;margin-bottom:4px">${s.name}</div><div style="font-size:.78rem;color:var(--text2);margin-bottom:4px">${s.description}</div><div>`;
+    for (const f of (s.features||[])) feat += `<span class="badge badge-info" style="margin:2px">${f}</span>`;
+    feat += '</div></div>'; } $('pipeline-features').innerHTML = feat;
+}
+
+// ── 5. SAFETY GATES ──
+async function loadSafety() {
+  const d = await api('/api/config'); const sg = d.safety_gates || {};
+  let h = '<div class="section"><div class="section-header"><h3>🔒 3-Layer Safety System</h3></div><div class="section-body">';
+  h += `<div class="safety-gate"><div class="safety-icon">🔐</div><div><div class="safety-label">Layer 1: Paper Trade (Hardcoded)</div><div style="font-size:.78rem;color:var(--text2)">${sg.layer_1_paper_trade}</div></div><div class="safety-status" style="color:var(--green2)">✅ LOCKED</div></div>`;
+  h += `<div class="safety-gate"><div class="safety-icon">${sg.layer_2_dry_run?'🔒':'🟢'}</div><div><div class="safety-label">Layer 2: Dry Run Mode</div><div style="font-size:.78rem;color:var(--text2)">execution_dry_run — When true, ALL trades blocked</div></div><div class="safety-status" style="color:${sg.layer_2_dry_run?'var(--yellow2)':'var(--green2)'}">${sg.layer_2_dry_run?'🔒 ENABLED (trades blocked)':'🟢 DISABLED (trades allowed)'}</div></div>`;
+  h += `<div class="safety-gate"><div class="safety-icon">${sg.approval_file_exists?'✅':'⛔'}</div><div><div class="safety-label">Layer 3: Approval File</div><div style="font-size:.78rem;color:var(--text2)" class="mono">${sg.layer_3_approval_file}</div></div><div class="safety-status" style="color:${sg.approval_file_exists?'var(--green2)':'var(--red2)'}">${sg.approval_file_exists?'✅ EXISTS — trading enabled':'⛔ MISSING — trading blocked'}</div></div>`;
+  h += '</div></div>';
+  // Risk parameters summary
+  const rl = d.risk_limits || {};
+  h += '<div class="section"><div class="section-header"><h3>🛡️ Active Risk Limits</h3></div><div class="section-body"><div class="config-grid">';
+  const items = [['Max $ / Trade',`$${fmt(rl.max_trade_notional_usd)}`],['Max Qty',rl.max_qty_per_trade],['Min Qty',rl.min_qty_per_trade],['Orders/Min',rl.max_orders_per_minute],['Orders/Symbol/Day',rl.max_orders_per_symbol_per_day],['Max Open Orders',rl.max_open_orders_total],['Cooldown (s)',`${rl.cooldown_seconds_per_symbol}s`],['Total Exposure',`$${fmt(rl.max_total_exposure_usd)}`],['Per-Symbol Exp',`$${fmt(rl.max_exposure_per_symbol_usd)}`],['Take Profit',`${((rl.take_profit_pct||0)*100).toFixed(1)}%`],['Stop Loss',`${((rl.stop_loss_pct||0)*100).toFixed(1)}%`],['Max Hold',`${rl.max_holding_minutes} min`],['Bracket Orders',rl.use_bracket_orders?'✅ On':'❌ Off'],['Exit Logic',rl.enable_exit_logic?'✅ On':'❌ Off'],['Check Pos Before Sell',rl.check_position_before_sell?'✅':'❌'],['Allow Add to Pos',rl.allow_add_to_position?'✅':'❌'],['Default Qty',rl.execution_default_qty],['Dry Run',rl.execution_dry_run?'🔒 Yes':'🟢 No']];
+  for (const [k,v] of items) h += `<div class="config-item"><span class="key">${k}</span><span class="val">${v}</span></div>`;
+  h += '</div></div></div>';
+  $('safety-body').innerHTML = h;
+}
+
+// ── 6. MODELS ──
+async function loadModels() {
+  const d = await api('/api/models'); let html = '';
+  for (const m of d.models) {
+    const isG = m.status==='green'; const cls = isG?'green-model':'candidate-model';
+    const sb = isG?'<span class="badge badge-up">🟢 GREEN</span>':'<span class="badge badge-warn">🟡 CANDIDATE</span>';
+    const mt = m.metrics||{}; const cfg = m.config||m.hyperparams||{}; const rid = m.model_id||m.run_id||'unknown';
+    html += `<div class="model-card ${cls}"><div class="model-header"><div class="model-id">${rid}</div><div>${sb}</div></div><div class="model-metrics">`;
+    const pairs = [['Train Loss',mt.train_loss!=null?Number(mt.train_loss).toExponential(4):null],['Val Loss',mt.val_loss!=null?Number(mt.val_loss).toExponential(4):null],['Epochs',mt.epochs],['Samples',mt.samples!=null?fmt(mt.samples):null],['Hidden Dim',cfg.hidden_dim||cfg.hidden_size],['Lookback',cfg.lookback_window||cfg.seq_length],['Attn Heads',cfg.num_heads||cfg.attention_heads],['Horizons',(cfg.horizons||[]).join(', ')],['Batch Size',cfg.batch_size],['Learning Rate',cfg.learning_rate],['Dropout',cfg.dropout],['ONNX File',m.onnx_exists?'✅ Yes':'❌ No'],['Feature Meta',m.has_feature_meta?'✅ Yes':'⚠️ No']];
+    for (const [l,v] of pairs) { if(v!=null) html += `<div class="model-metric"><div class="label">${l}</div><div class="value">${v}</div></div>`; }
+    if (m.onnx_path_size_mb) html += `<div class="model-metric"><div class="label">ONNX Size</div><div class="value">${m.onnx_path_size_mb} MB</div></div>`;
+    if (m.checkpoint_path_size_mb) html += `<div class="model-metric"><div class="label">Checkpoint</div><div class="value">${m.checkpoint_path_size_mb} MB</div></div>`;
+    html += '</div>';
+    if (m.feature_meta) html += `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:.74rem;color:var(--text3)">Feature Meta (${m.feature_meta.feature_names?.length||0} features)</summary><div class="mono" style="font-size:.7rem;color:var(--text2);padding:6px 0">${(m.feature_meta.feature_names||[]).join(', ')}</div></details>`;
+    html += `<div style="margin-top:6px;font-size:.7rem;color:var(--text3)">Created: ${m.created_at||'N/A'}${m.onnx_path_modified?' · ONNX modified: '+m.onnx_path_modified:''}</div></div>`;
+  }
+  $('models-body').innerHTML = html || '<p style="color:var(--text3)">No models in registry</p>';
+}
+
+// ── 7. FEATURES ──
+async function loadFeatures() {
+  const d = await api('/api/features');
+  $('feat-count').textContent = `${d.total} columns`;
+  let h = '<table class="data-table"><thead><tr><th>Column</th><th>Type</th><th>Category</th></tr></thead><tbody>';
+  let lastCat = '';
+  for (const f of d.features||[]) {
+    if (f.category !== lastCat) { lastCat = f.category; h += `<tr><td colspan="3" class="feature-cat">${f.category}</td></tr>`; }
+    h += `<tr><td class="mono" style="color:var(--accent2)">${f.column}</td><td class="mono" style="color:var(--text3)">${f.type}</td><td style="font-size:.74rem;color:var(--text3)">${f.category}</td></tr>`;
+  }
+  h += '</tbody></table>'; $('features-body').innerHTML = h;
+}
+
+// ── 8. KAFKA ──
+async function loadKafka() {
+  const d = await api('/api/kafka'); let html = '';
+  for (const t of d.topics) { const id = 'sch-'+t.name.replace(/\./g,'-');
+    html += `<div class="schema-toggle" onclick="toggleSchema('${id}')"><div><span class="mono" style="color:var(--accent2);font-weight:600">${t.name}</span><span style="margin-left:10px;font-size:.74rem;color:var(--text3)">${t.desc}</span></div><div style="display:flex;align-items:center;gap:8px"><span class="badge badge-info">${t.schema_fields.length} fields</span><span class="badge badge-purple">${t.schema_name||''}</span><span class="arrow">▶</span></div></div>
+    <div class="schema-content" id="${id}"><table class="data-table"><thead><tr><th>Field</th><th>Type</th><th>Default</th></tr></thead><tbody>${t.schema_fields.map(f=>`<tr><td class="mono" style="color:var(--accent2)">${f.name}</td><td class="mono" style="color:var(--text3)">${f.type}</td><td class="mono" style="color:var(--text3);font-size:.72rem">${f.default!==undefined&&f.default!=='—'?JSON.stringify(f.default):'—'}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  $('kafka-body').innerHTML = html;
+}
+function toggleSchema(id) { const el = $(id); el.classList.toggle('open'); el.previousElementSibling.classList.toggle('open'); }
+
+// ── 9. DATABASE ──
+async function loadDatabase() {
+  const d = await api('/api/database'); const live = d.live_stats;
+  // Summary cards
+  if (live && !live.error && live._database_total) {
+    const total = live._database_total;
+    const tableCount = Object.keys(live).filter(k=>!k.startsWith('_')).length;
+    const totalRows = Object.values(live).filter(v=>typeof v==='object'&&typeof v.rows==='number').reduce((s,v)=>s+v.rows,0);
+    $('db-summary').innerHTML = `<div class="card card-accent"><div class="card-label">DB Size</div><div class="card-value">${total.size_mb} MB</div></div><div class="card card-green"><div class="card-label">Tables</div><div class="card-value">${tableCount}</div></div><div class="card card-cyan"><div class="card-label">Total Rows</div><div class="card-value">${fmt(totalRows)}</div></div><div class="card card-purple"><div class="card-label">Hypertables</div><div class="card-value">${(d.hypertables||[]).length}</div></div>`;
+  }
+  // Table tabs with columns
+  const tables = d.tables || [];
+  let tabsH = ''; let contentH = '';
+  tables.forEach((t, i) => {
+    const liveInfo = live && !live.error ? live[t.name] : null;
+    const rows = liveInfo ? fmt(liveInfo.rows) : '—';
+    const size = liveInfo && liveInfo.size_mb ? `${liveInfo.size_mb} MB` : '';
+    tabsH += `<div class="tab ${i===0?'active':''}" onclick="showDbTab(${i})">${t.name}</div>`;
+    contentH += `<div class="tab-content ${i===0?'active':''}" id="dbtab-${i}"><div class="section"><div class="section-header"><h3 class="mono">${t.name}</h3><div style="display:flex;gap:8px">${rows!=='—'?`<span class="badge badge-up">${rows} rows</span>`:''}${size?`<span class="badge badge-info">${size}</span>`:''}</div></div><div class="section-body"><table class="data-table"><thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Default</th></tr></thead><tbody>`;
+    for (const c of t.columns||[]) contentH += `<tr><td class="mono" style="color:var(--accent2)">${c.name}</td><td class="mono" style="color:var(--text3)">${c.type}</td><td>${c.nullable?'<span style="color:var(--text3)">YES</span>':'<span style="color:var(--yellow2)">NOT NULL</span>'}</td><td class="mono" style="font-size:.72rem;color:var(--text3)">${c.default||'—'}</td></tr>`;
+    contentH += '</tbody></table></div></div></div>';
+  });
+  $('db-tabs').innerHTML = tabsH;
+  $('db-tab-content').innerHTML = contentH;
+  // Retention
+  let rh = '<table class="data-table"><thead><tr><th>Table</th><th>Retention</th></tr></thead><tbody>';
+  for (const r of d.retention_policies||[]) rh += `<tr><td class="mono">${r.table}</td><td>${r.interval}</td></tr>`;
+  rh += '</tbody></table>'; $('db-retention').innerHTML = rh;
+  // Indexes
+  let ih = '<table class="data-table"><thead><tr><th>Index</th><th>Table</th><th>Columns</th></tr></thead><tbody>';
+  for (const idx of d.indexes||[]) ih += `<tr><td class="mono" style="font-size:.72rem">${idx.name}</td><td class="mono">${idx.table}</td><td class="mono" style="color:var(--accent2)">${idx.columns}</td></tr>`;
+  ih += '</tbody></table>'; $('db-indexes').innerHTML = ih;
+}
+function showDbTab(i) { document.querySelectorAll('#db-tabs .tab').forEach((t,j)=>{t.classList.toggle('active',j===i)}); document.querySelectorAll('#db-tab-content .tab-content').forEach((t,j)=>{t.classList.toggle('active',j===i)}); }
+
+// ── 10. CONFIG ──
+async function loadConfig() {
+  const d = await api('/api/config');
+  // Risk
+  const rl = d.risk_limits||{};
+  let rh = '<div class="config-grid">';
+  for (const [k,v] of Object.entries(rl)) { const dv = typeof v==='boolean'?(v?'✅ Yes':'❌ No'):(typeof v==='number'&&k.includes('pct')?`${(v*100).toFixed(1)}%`:(typeof v==='number'&&k.includes('usd')?`$${fmt(v)}`:fmt(v))); rh += `<div class="config-item"><span class="key">${k.replace(/_/g,' ')}</span><span class="val">${dv}</span></div>`; }
+  rh += '</div>'; $('risk-config').innerHTML = rh;
+  // Training
+  const tr = d.training||{};
+  let th = '<div class="config-grid">';
+  for (const [k,v] of Object.entries(tr)) th += `<div class="config-item"><span class="key">${k}</span><span class="val">${Array.isArray(v)?v.join(', '):v}</span></div>`;
+  th += '</div>'; $('training-config').innerHTML = th || '<p style="color:var(--text3)">—</p>';
+  // Trader decision
+  const td = d.trader_decision||{};
+  let tdh = '<div class="config-grid">';
+  for (const [k,v] of Object.entries(td)) tdh += `<div class="config-item"><span class="key">${k}</span><span class="val">${v}</span></div>`;
+  tdh += '</div>'; $('trader-config').innerHTML = tdh || '<p style="color:var(--text3)">—</p>';
+  // Data
+  const da = d.data||{};
+  let dh = '<div class="config-grid">';
+  for (const [k,v] of Object.entries(da)) dh += `<div class="config-item"><span class="key">${k}</span><span class="val mono" style="font-size:.74rem">${v}</span></div>`;
+  dh += '</div>'; $('data-config').innerHTML = dh || '<p style="color:var(--text3)">—</p>';
+  // LLM
+  const llm = d.llm||{};
+  if (Object.keys(llm).length) { let lh = '<div class="config-grid">'; const flat = flattenObj(llm); for (const [k,v] of Object.entries(flat)) lh += `<div class="config-item"><span class="key">${k}</span><span class="val">${v}</span></div>`; lh += '</div>'; $('llm-config').innerHTML = lh; }
+  else { $('llm-config').innerHTML = '<p style="color:var(--text3)">No LLM config found</p>'; }
+}
+function flattenObj(obj, prefix='') { const r={}; for (const [k,v] of Object.entries(obj)) { const key=prefix?`${prefix}.${k}`:k; if(typeof v==='object'&&v!==null&&!Array.isArray(v)) Object.assign(r,flattenObj(v,key)); else r[key]=Array.isArray(v)?v.join(', '):v; } return r; }
+
+// ── 11. UNIVERSE ──
+async function loadUniverse() {
+  const d = await api('/api/universe'); const syms = d.symbols||[];
+  $('universe-count').textContent = `${syms.length} symbols`;
+  if (!syms.length) { $('universe-body').innerHTML='<p style="color:var(--text3)">No data</p>'; return; }
+  const keys = Object.keys(syms[0]);
+  let h = '<table class="data-table"><thead><tr>';
+  for (const k of keys) h += `<th>${k}</th>`;
+  h += '</tr></thead><tbody>';
+  for (const s of syms) { h += '<tr>'; for (const k of keys) { let v=s[k]; if(k==='ticker') h+=`<td class="mono" style="font-weight:700;color:var(--accent2)">${v}</td>`; else if(k.includes('price')) h+=`<td>$${Number(v).toFixed(2)}</td>`; else if(k.includes('dollar_volume')) h+=`<td>$${(Number(v)/1e9).toFixed(2)}B</td>`; else if(k==='coverage') h+=`<td>${(Number(v)*100).toFixed(0)}%</td>`; else if(k.includes('volume')) h+=`<td>${fmt(Math.round(Number(v)))}</td>`; else h+=`<td>${v}</td>`; } h+='</tr>'; }
+  h += '</tbody></table>'; $('universe-body').innerHTML = h;
+}
+
+// ── 12. DOCKER ──
+async function loadDocker() {
+  const d = await api('/api/docker'); const svcs = d.services||[];
+  $('docker-summary').innerHTML = `<div class="card card-accent"><div class="card-label">Services</div><div class="card-value">${svcs.length}</div></div><div class="card card-green"><div class="card-label">Volumes</div><div class="card-value">${(d.volumes||[]).length}</div></div><div class="card card-cyan"><div class="card-label">Networks</div><div class="card-value">${(d.networks||[]).length}</div></div>`;
+  let h = '<table class="data-table"><thead><tr><th>Service</th><th>Image</th><th>Ports</th><th>Depends On</th><th>Healthcheck</th><th>Restart</th></tr></thead><tbody>';
+  for (const s of svcs) h += `<tr><td style="font-weight:600">${s.name}</td><td class="mono" style="font-size:.7rem;color:var(--text2)">${s.image}</td><td class="mono" style="font-size:.72rem">${s.ports.join(', ')||'—'}</td><td style="font-size:.74rem;color:var(--text3)">${s.depends_on.join(', ')||'—'}</td><td class="mono" style="font-size:.68rem;color:var(--text3);max-width:200px;overflow:hidden;text-overflow:ellipsis">${s.healthcheck||'—'}</td><td style="font-size:.74rem">${s.restart||'—'}</td></tr>`;
+  h += '</tbody></table>'; $('docker-body').innerHTML = h;
+  let vh = '<div style="display:flex;gap:20px;flex-wrap:wrap"><div><div style="font-size:.78rem;color:var(--text3);margin-bottom:6px">Volumes</div>';
+  for (const v of d.volumes||[]) vh += `<div class="mono" style="font-size:.78rem;padding:3px 0">${v}</div>`;
+  vh += '</div><div><div style="font-size:.78rem;color:var(--text3);margin-bottom:6px">Networks</div>';
+  for (const n of d.networks||[]) vh += `<div class="mono" style="font-size:.78rem;padding:3px 0">${n}</div>`;
+  vh += '</div></div>'; $('docker-vols').innerHTML = vh;
+}
+
+// ── 13. ALERTS ──
+async function loadAlerts() {
+  const [alerts, am] = await Promise.all([api('/api/alerts'), api('/api/alertmanager')]);
+  let h = '';
+  for (const g of alerts.groups||[]) {
+    h += `<div class="section"><div class="section-header"><h3>🔔 ${g.name}</h3><span class="badge badge-info">${g.rules.length} rules</span></div><div class="section-body">`;
+    for (const r of g.rules) h += `<div class="alert-card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="alert-name">${r.alert}</div>${sevBadge(r.severity)}</div><div class="alert-expr">${r.expr}</div><div class="alert-meta"><strong>For:</strong> ${r.for} · <strong>Summary:</strong> ${r.summary}</div><div style="font-size:.74rem;color:var(--text3);margin-top:2px">${r.description}</div></div>`;
+    h += '</div></div>';
+  }
+  $('alerts-body').innerHTML = h;
+  // Alertmanager
+  const route = am.route||{};
+  let amh = '<div class="config-grid">';
+  amh += `<div class="config-item"><span class="key">Default Receiver</span><span class="val">${route.receiver||'—'}</span></div>`;
+  amh += `<div class="config-item"><span class="key">Group By</span><span class="val">${(route.group_by||[]).join(', ')}</span></div>`;
+  amh += `<div class="config-item"><span class="key">Group Wait</span><span class="val">${route.group_wait||'—'}</span></div>`;
+  amh += `<div class="config-item"><span class="key">Repeat Interval</span><span class="val">${route.repeat_interval||'—'}</span></div>`;
+  amh += '</div>';
+  amh += '<div style="margin-top:12px;font-size:.78rem;color:var(--text3)">Receivers:</div>';
+  for (const recv of am.receivers||[]) amh += `<div class="config-item" style="margin-top:4px"><span class="key">${recv.name}</span><span class="val mono" style="font-size:.7rem">${JSON.stringify(recv.webhook_configs||recv.email_configs||'—').substring(0,80)}</span></div>`;
+  $('alertmanager-body').innerHTML = amh;
+}
+
+// ── 14. METRICS ──
+async function loadMetrics() {
+  const d = await api('/api/prometheus-metrics');
+  let h = `<div style="margin-bottom:12px;font-size:.82rem;color:var(--text2)">${d.total} metrics defined in src/monitoring/metrics.py</div>`;
+  h += '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Description</th><th>Labels</th></tr></thead><tbody>';
+  for (const m of d.metrics||[]) { const typeColor = m.type==='counter'?'var(--green2)':m.type==='gauge'?'var(--accent2)':'var(--purple2)';
+    h += `<tr><td class="mono" style="color:var(--accent2)">${m.name}</td><td><span class="badge" style="background:${typeColor}22;color:${typeColor}">${m.type}</span></td><td style="font-size:.78rem;color:var(--text2)">${m.description}</td><td class="mono" style="font-size:.7rem;color:var(--text3)">${m.labels.join(', ')||'—'}</td></tr>`; }
+  h += '</tbody></table>'; $('metrics-body').innerHTML = h;
+}
+
+// ── 15. DIRECTIVES ──
+async function loadDirectives() {
+  const d = await api('/api/directives');
+  let h = '';
+  for (const dir of d.directives||[]) {
+    h += `<div class="directive-card" onclick="this.querySelector('.directive-content').classList.toggle('open')"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:600;font-size:.88rem">${dir.title}</div><div class="mono" style="font-size:.72rem;color:var(--text3)">${dir.file} · ${dir.lines} lines · ${(dir.size_bytes/1024).toFixed(1)} KB</div></div><span class="badge badge-info">📋 SOP</span></div><div class="directive-content">${escapeHtml(dir.full_content)}</div></div>`;
+  }
+  $('directives-body').innerHTML = h || '<p style="color:var(--text3)">No directives found</p>';
+}
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── 16. MAKEFILE ──
+async function loadMakefile() {
+  const d = await api('/api/makefile');
+  $('make-count').textContent = `${d.total} targets`;
+  let h = '<table class="data-table"><thead><tr><th>Target</th><th>Command</th><th>Description</th></tr></thead><tbody>';
+  for (const t of d.targets||[]) h += `<tr><td class="mono" style="color:var(--green2);font-weight:600">${t.name}</td><td class="mono" style="font-size:.7rem;color:var(--text2);max-width:400px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(t.command)}</td><td style="font-size:.78rem;color:var(--text3)">${t.description}</td></tr>`;
+  h += '</tbody></table>'; $('make-body').innerHTML = h;
+}
+
+// ── 17. DEPENDENCIES ──
+async function loadDeps() {
+  const d = await api('/api/dependencies');
+  $('deps-summary').innerHTML = `<div class="card card-accent"><div class="card-label">Project</div><div class="card-value" style="font-size:1.1rem">${d.project_name}</div><div class="card-sub">v${d.version}</div></div><div class="card card-green"><div class="card-label">Python</div><div class="card-value">${d.requires_python}</div></div><div class="card card-cyan"><div class="card-label">Total Deps</div><div class="card-value">${d.total}</div></div>`;
+  const groups = {core:[], ml:[], dev:[]};
+  for (const dep of d.dependencies||[]) (groups[dep.group]||groups.core).push(dep.package);
+  $('deps-core').innerHTML = groups.core.map(p=>`<span class="dep-tag core">${p}</span>`).join('');
+  $('deps-ml').innerHTML = groups.ml.map(p=>`<span class="dep-tag ml">${p}</span>`).join('') || '<span style="color:var(--text3)">—</span>';
+  $('deps-dev').innerHTML = groups.dev.map(p=>`<span class="dep-tag dev">${p}</span>`).join('') || '<span style="color:var(--text3)">—</span>';
+}
+
+// ── 18. CODEBASE ──
+async function loadCodebase() {
+  const [overview, git, tests] = await Promise.all([api('/api/overview'), api('/api/git'), api('/api/tests')]);
+  $('code-cards').innerHTML = `
+    <div class="card card-accent"><div class="card-label">Source Files</div><div class="card-value">${overview.src_files}</div><div class="card-sub">${fmt(overview.src_lines)} lines</div></div>
+    <div class="card card-purple"><div class="card-label">Test Files</div><div class="card-value">${tests.unit_test_files+tests.integration_test_files}</div><div class="card-sub">${tests.total_test_functions} test functions</div></div>
+    <div class="card card-yellow"><div class="card-label">Scripts</div><div class="card-value">${overview.script_files}</div></div>
+    <div class="card card-cyan"><div class="card-label">Git Branch</div><div class="card-value">${git.branch||'?'}</div><div class="card-sub">${git.commit_count||0} commits</div></div>
+    <div class="card card-orange"><div class="card-label">Changes</div><div class="card-value">${git.total_changes||0}</div><div class="card-sub">${git.modified_files||0} mod · ${git.untracked_files||0} new</div></div>`;
+  // Git
+  if (git.error) { $('git-body').innerHTML = `<p style="color:var(--red2)">${git.error}</p>`; }
+  else {
+    let gh = `<div style="display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap"><div><span style="color:var(--text3)">Branch:</span> <strong>${git.branch}</strong></div><div><span style="color:var(--text3)">Commits:</span> <strong>${git.commit_count}</strong></div><div><span style="color:var(--text3)">Modified:</span> <strong style="color:var(--yellow2)">${git.modified_files}</strong></div><div><span style="color:var(--text3)">Untracked:</span> <strong style="color:var(--cyan2)">${git.untracked_files}</strong></div><div><span style="color:var(--text3)">Added:</span> <strong style="color:var(--green2)">${git.added_files}</strong></div><div><span style="color:var(--text3)">Deleted:</span> <strong style="color:var(--red2)">${git.deleted_files}</strong></div>${git.remote?`<div><span style="color:var(--text3)">Remote:</span> <span class="mono" style="font-size:.74rem">${git.remote}</span></div>`:''}</div>`;
+    gh += '<div style="font-size:.78rem;color:var(--text3);margin-bottom:6px">Recent Commits</div>';
+    gh += `<ul class="commit-list">${(git.recent_commits||[]).map(c=>{const p=c.split(' ');return`<li><span class="commit-hash">${p[0]}</span>${p.slice(1).join(' ')}</li>`}).join('')}</ul>`;
+    if (git.modified_list?.length) { gh += '<div style="font-size:.78rem;color:var(--text3);margin:12px 0 6px">Modified Files</div>'; gh += git.modified_list.map(f=>`<div class="mono" style="font-size:.72rem;color:var(--yellow2);padding:2px 0">${f}</div>`).join(''); }
+    if (git.untracked_list?.length) { gh += '<div style="font-size:.78rem;color:var(--text3);margin:12px 0 6px">Untracked Files (showing 20)</div>'; gh += git.untracked_list.map(f=>`<div class="mono" style="font-size:.72rem;color:var(--cyan2);padding:2px 0">${f}</div>`).join(''); }
+    $('git-body').innerHTML = gh;
+  }
+  // Tests
+  let testH = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+  testH += '<div><div style="font-size:.78rem;color:var(--text3);margin-bottom:6px">Unit Tests</div>';
+  for (const t of tests.unit_tests||[]) testH += `<div style="padding:2px 0;font-size:.74rem;display:flex;justify-content:space-between"><span class="mono" style="color:var(--text2)">${t.file}</span><span class="badge badge-info">${t.test_count} tests</span></div>`;
+  testH += '</div><div><div style="font-size:.78rem;color:var(--text3);margin-bottom:6px">Integration Tests</div>';
+  for (const t of tests.integration_tests||[]) testH += `<div style="padding:2px 0;font-size:.74rem;display:flex;justify-content:space-between"><span class="mono" style="color:var(--text2)">${t.file}</span><span class="badge badge-info">${t.test_count} tests</span></div>`;
+  testH += '</div></div>'; $('tests-body').innerHTML = testH;
+}
+
+// ── 19. SOURCE TREE ──
+async function loadSrcTree() {
+  const d = await api('/api/source-tree');
+  function renderTree(obj, depth=0) {
+    let h = '';
+    for (const [k, v] of Object.entries(obj)) {
+      if (v.lines !== undefined) { h += `<div style="padding:2px 0;padding-left:${depth*16}px;display:flex;justify-content:space-between"><span class="mono" style="font-size:.74rem;color:var(--text2)">${k}</span><span style="font-size:.7rem;color:var(--text3)">${v.lines} lines · ${v.size_kb} KB</span></div>`; }
+      else { h += `<div style="padding:3px 0;padding-left:${depth*16}px;font-weight:600;font-size:.78rem;color:var(--accent2)">📁 ${k}/</div>`; h += renderTree(v, depth+1); }
+    }
+    return h;
+  }
+  $('src-tree').innerHTML = renderTree(d.tree || {});
+}
+
+// ── 20. LOGS ──
+async function loadLogs() {
+  const d = await api('/api/logs');
+  if (!d.files?.length) { $('logs-body').innerHTML = '<p style="color:var(--text3)">No log files</p>'; return; }
+  let h = '<table class="data-table"><thead><tr><th>File</th><th>Size</th><th>Modified</th></tr></thead><tbody>';
+  for (const f of d.files) h += `<tr><td class="mono">${f.name}</td><td>${f.size_kb} KB</td><td style="font-size:.74rem;color:var(--text3)">${f.modified||'—'}</td></tr>`;
+  h += '</tbody></table>'; $('logs-body').innerHTML = h;
+}
+
+// ── Clock + Init ──
+function updateClock() { $('sidebar-time').textContent = new Date().toLocaleTimeString(); setTimeout(updateClock, 1000); }
+updateClock(); loadAll();
+</script>
+</body>
+</html>

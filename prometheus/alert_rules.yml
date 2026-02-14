@@ -1,0 +1,89 @@
+# AWET Prometheus Alert Rules
+# ============================
+
+groups:
+  - name: agent_health
+    rules:
+      # Agent is down (no scrape for 1 min)
+      - alert: AgentDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Agent {{ $labels.instance }} is down"
+          description: "Agent has not responded to health scrapes for 1 minute."
+
+      # High event processing failure rate
+      - alert: HighFailureRate
+        expr: |
+          rate(events_failed_total[5m]) 
+          / (rate(events_processed_total[5m]) + rate(events_failed_total[5m]) + 0.001) 
+          > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High failure rate on {{ $labels.agent }}"
+          description: "More than 10% of events are failing on agent {{ $labels.agent }}."
+
+      # No events processed for 5 minutes during market hours
+      - alert: NoEventsProcessed
+        expr: |
+          increase(events_processed_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No events processed on {{ $labels.agent }}"
+          description: "Agent {{ $labels.agent }} has not processed any events in 5 minutes."
+
+  - name: risk_alerts
+    rules:
+      # Kill switch activated
+      - alert: KillSwitchActive
+        expr: risk_kill_switch_active == 1
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kill switch is ACTIVE"
+          description: "The risk engine kill switch has been activated. All trades are blocked."
+
+      # High risk rejection rate
+      - alert: HighRiskRejectionRate
+        expr: |
+          rate(risk_decisions_total{decision="rejected"}[10m])
+          / (rate(risk_decisions_total[10m]) + 0.001)
+          > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "90%+ of trades are being rejected by risk engine"
+          description: "Very high rejection rate may indicate a configuration issue or market anomaly."
+
+  - name: latency_alerts
+    rules:
+      # Event processing latency > 5s
+      - alert: HighEventLatency
+        expr: |
+          histogram_quantile(0.95, rate(event_latency_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on {{ $labels.agent }}"
+          description: "P95 event latency is above 5 seconds on agent {{ $labels.agent }}."
+
+  - name: kafka_alerts
+    rules:
+      # Consumer lag too high
+      - alert: HighConsumerLag
+        expr: kafka_consumer_lag_total > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Kafka consumer lag on {{ $labels.consumer_group }}"
+          description: "Consumer group {{ $labels.consumer_group }} has lag > 1000 messages."

@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """TFT training CLI with TimescaleDB integration and model registry.
 
+.. deprecated::
+    This training script uses ``TemporalFusionTransformerCore`` from
+    ``src/ml/tft/model.py`` (Lightning-based).  The canonical training
+    pipeline is ``scripts/train_tft_baseline.py`` which trains the
+    production ``SimpleTFTModel``, exports to ONNX with
+    ``feature_meta.json``, and registers in the model registry.
+    Use that instead.
+
 Usage:
     python -m src.ml.train --from-db --epochs 50 --promote
     python -m src.ml.train --export-only --model-id <id>

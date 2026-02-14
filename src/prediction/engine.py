@@ -44,7 +44,7 @@ class PredictionInput:
     day_of_week: int
 
     def to_array(self) -> np.ndarray:
-        """Convert to numpy array for model input."""
+        """Convert to numpy array for model input (15-feature baseline)."""
         return np.array([
             self.price,
             self.volume,
@@ -62,6 +62,32 @@ class PredictionInput:
             float(self.minute_of_day),
             float(self.day_of_week),
         ], dtype=np.float32)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dict for flexible feature extraction.
+
+        ONNXInferenceEngine.extract_features() accepts a dict and
+        dynamically selects which features to use based on model
+        metadata.  Callers with extended features can merge additional
+        keys into the returned dict before passing it.
+        """
+        return {
+            "price": self.price,
+            "volume": self.volume,
+            "returns_1": self.returns_1,
+            "returns_5": self.returns_5,
+            "returns_15": self.returns_15,
+            "volatility_5": self.volatility_5,
+            "volatility_15": self.volatility_15,
+            "sma_5": self.sma_5,
+            "sma_20": self.sma_20,
+            "ema_5": self.ema_5,
+            "ema_20": self.ema_20,
+            "rsi_14": self.rsi_14,
+            "volume_zscore": self.volume_zscore,
+            "minute_of_day": self.minute_of_day,
+            "day_of_week": self.day_of_week,
+        }
 
 
 @dataclass
@@ -166,6 +192,14 @@ class StubPredictionEngine(BasePredictionEngine):
 
 class TFTModelEngine(BasePredictionEngine):
     """Real TFT model engine using PyTorch.
+
+    .. deprecated::
+        This engine uses ``torch.jit.load()`` which is incompatible
+        with current training checkpoints (saved via
+        ``model.state_dict()``).  Use :class:`ONNXPredictionEngine`
+        for production inference.  This class is retained only for
+        backward compatibility and will fall back to
+        :class:`StubPredictionEngine` when the model cannot be loaded.
 
     Loads a trained TFT model from disk and generates predictions.
     Falls back to stub if model not available.
@@ -305,24 +339,9 @@ class ONNXPredictionEngine(BasePredictionEngine):
         if self._engine is None or not self._engine.is_loaded:
             return await self._fallback.predict(input_data)
         
-        # Build event data from input
-        event_data = {
-            "price": input_data.price,
-            "volume": input_data.volume,
-            "returns_1": input_data.returns_1,
-            "returns_5": input_data.returns_5,
-            "returns_15": input_data.returns_15,
-            "volatility_5": input_data.volatility_5,
-            "volatility_15": input_data.volatility_15,
-            "sma_5": input_data.sma_5,
-            "sma_20": input_data.sma_20,
-            "ema_5": input_data.ema_5,
-            "ema_20": input_data.ema_20,
-            "rsi_14": input_data.rsi_14,
-            "volume_zscore": input_data.volume_zscore,
-            "minute_of_day": input_data.minute_of_day,
-            "day_of_week": input_data.day_of_week,
-        }
+        # Build event data dict — ONNXInferenceEngine.extract_features()
+        # dynamically selects which keys to use based on feature_meta.json
+        event_data = input_data.to_dict()
         
         # Add tick to rolling buffer
         self._engine.add_tick(input_data.symbol, event_data)

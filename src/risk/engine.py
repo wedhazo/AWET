@@ -7,10 +7,12 @@ This module implements institutional-grade risk controls:
 - CVaR (Conditional Value at Risk) calculation
 - Correlation spike detection
 - Kill switch for emergency stops
+- State persistence to Redis (survives restarts)
 """
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -95,6 +97,58 @@ class PositionState:
         """Reset daily tracking (call at market open)."""
         self.daily_pnl = 0.0
         self.last_reset = datetime.now(timezone.utc)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize for Redis persistence."""
+        return {
+            "positions": self.positions,
+            "daily_pnl": self.daily_pnl,
+            "portfolio_value": self.portfolio_value,
+            "kill_switch_active": self.kill_switch_active,
+            "last_reset": self.last_reset.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PositionState":
+        """Deserialize from Redis."""
+        last_reset = data.get("last_reset")
+        if isinstance(last_reset, str):
+            last_reset = datetime.fromisoformat(last_reset)
+        else:
+            last_reset = datetime.now(timezone.utc)
+        return cls(
+            positions=data.get("positions", {}),
+            daily_pnl=data.get("daily_pnl", 0.0),
+            portfolio_value=data.get("portfolio_value", 100000.0),
+            kill_switch_active=data.get("kill_switch_active", False),
+            last_reset=last_reset,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize state for Redis persistence."""
+        return {
+            "positions": self.positions,
+            "daily_pnl": self.daily_pnl,
+            "portfolio_value": self.portfolio_value,
+            "kill_switch_active": self.kill_switch_active,
+            "last_reset": self.last_reset.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PositionState:
+        """Restore state from Redis snapshot."""
+        state = cls()
+        state.positions = data.get("positions", {})
+        state.daily_pnl = float(data.get("daily_pnl", 0.0))
+        state.portfolio_value = float(data.get("portfolio_value", 100000.0))
+        state.kill_switch_active = bool(data.get("kill_switch_active", False))
+        last_reset = data.get("last_reset")
+        if last_reset:
+            try:
+                state.last_reset = datetime.fromisoformat(last_reset)
+            except (ValueError, TypeError):
+                state.last_reset = datetime.now(timezone.utc)
+        return state
 
 
 class RiskEngine:
@@ -291,6 +345,71 @@ class RiskEngine:
         """Reset daily tracking."""
         self.state.reset_daily()
         logger.info("daily_risk_reset")
+
+    # ── Redis state persistence ──────────────────────────────────────────
+
+    async def connect_redis(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        key: str = "awet:risk:state",
+    ) -> None:
+        """Connect to Redis for state persistence."""
+        try:
+            import redis.asyncio as aioredis
+        except ImportError:
+            logger.warning("redis_not_installed", hint="pip install redis")
+            self._redis: Any = None
+            self._redis_key = key
+            return
+        self._redis_key = key
+        host = host or os.getenv("REDIS_HOST", "localhost")
+        port = port or int(os.getenv("REDIS_PORT", "6379"))
+        self._redis = aioredis.Redis(host=host, port=port, decode_responses=True)
+        try:
+            await self._redis.ping()
+            logger.info("risk_redis_connected", host=host, port=port)
+        except Exception as exc:
+            logger.warning("risk_redis_unavailable", error=str(exc))
+            self._redis = None
+
+    async def close_redis(self) -> None:
+        """Close Redis connection."""
+        if getattr(self, "_redis", None):
+            await self._redis.aclose()
+            self._redis = None
+
+    async def save_state(self) -> None:
+        """Persist current PositionState to Redis (TTL 24h)."""
+        redis_client = getattr(self, "_redis", None)
+        if not redis_client:
+            return
+        try:
+            key = getattr(self, "_redis_key", "awet:risk:state")
+            await redis_client.set(key, json.dumps(self.state.to_dict()), ex=86400)
+        except Exception as exc:
+            logger.warning("risk_state_save_error", error=str(exc))
+
+    async def load_state(self) -> bool:
+        """Restore PositionState from Redis. Returns True if restored."""
+        redis_client = getattr(self, "_redis", None)
+        if not redis_client:
+            return False
+        try:
+            key = getattr(self, "_redis_key", "awet:risk:state")
+            data = await redis_client.get(key)
+            if data:
+                self.state = PositionState.from_dict(json.loads(data))
+                logger.info(
+                    "risk_state_restored",
+                    positions=len(self.state.positions),
+                    daily_pnl=self.state.daily_pnl,
+                    kill_switch=self.state.kill_switch_active,
+                )
+                return True
+        except Exception as exc:
+            logger.warning("risk_state_load_error", error=str(exc))
+        return False
 
 
 _engine: RiskEngine | None = None

@@ -52,10 +52,11 @@ class PredictionAgent(BaseAgent):
         self.app.add_event_handler("shutdown", self._shutdown)
         await self.audit.connect()
         await self.engine.warmup()
-        asyncio.create_task(self._consume_loop())
+        self.track_task(asyncio.create_task(self._consume_loop()))
 
     async def _shutdown(self) -> None:
         self.consumer.close()
+        self.producer.close()
         await self.audit.close()
 
     def _build_input(self, event: MarketEngineeredEvent) -> PredictionInput:
@@ -80,7 +81,8 @@ class PredictionAgent(BaseAgent):
         )
 
     async def _consume_loop(self) -> None:
-        while True:
+        while not self.is_shutting_down:
+          try:
             msg = self.consumer.poll(1.0)
             if msg is None:
                 await asyncio.sleep(0.1)
@@ -155,6 +157,12 @@ class PredictionAgent(BaseAgent):
                 confidence=pred_output.confidence,
                 q50_30=pred_output.horizon_30_q50,
             )
+          except asyncio.CancelledError:
+              self.logger.info("consume_loop_cancelled")
+              break
+          except Exception:
+              self.logger.exception("consume_loop_error")
+              await asyncio.sleep(1.0)
 
 
 def main() -> None:

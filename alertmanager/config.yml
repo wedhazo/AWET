@@ -1,5 +1,63 @@
+# AWET Alertmanager Configuration
+# =================================
+# Configure receivers below using env vars or direct values.
+# Default: webhook receiver (works with Slack incoming webhooks, Discord, etc.)
+#
+# To enable:
+#   1. Set SLACK_WEBHOOK_URL in .env
+#   2. Or replace the webhook_url below with your actual URL
+#   3. For email: uncomment the email_configs section and fill SMTP details
+
+global:
+  resolve_timeout: 5m
+  # smtp_smarthost: "smtp.gmail.com:587"
+  # smtp_from: "alerts@awet.dev"
+  # smtp_auth_username: ""
+  # smtp_auth_password: ""
+
 route:
-  receiver: "null"
+  receiver: default
+  group_by: ["alertname", "agent"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Critical alerts: kill switch, data loss, agent crash
+    - match:
+        severity: critical
+      receiver: critical
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Warning alerts: high latency, consumer lag, degraded health
+    - match:
+        severity: warning
+      receiver: default
+      repeat_interval: 4h
 
 receivers:
-  - name: "null"
+  - name: default
+    webhook_configs:
+      - url: "http://localhost:9999/alert"
+        send_resolved: true
+    # Uncomment for email:
+    # email_configs:
+    #   - to: "team@example.com"
+    #     send_resolved: true
+
+  - name: critical
+    webhook_configs:
+      - url: "http://localhost:9999/alert"
+        send_resolved: true
+    # Uncomment for PagerDuty:
+    # pagerduty_configs:
+    #   - service_key: "<YOUR_PAGERDUTY_KEY>"
+
+inhibit_rules:
+  # Don't fire warnings if a critical for the same agent is already firing
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ["agent"]

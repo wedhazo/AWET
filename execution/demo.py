@@ -19,8 +19,33 @@ from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import StringSerializer
 from confluent_kafka.serializing_producer import SerializingProducer
 
+from src.core.config import load_settings
+
 APPROVAL_FILE = Path(".tmp/APPROVE_EXECUTION")
 RAW_SCHEMA_PATH = "src/schemas/market_raw.avsc"
+
+
+def is_execution_approved() -> tuple[bool, str]:
+    """
+    Check if execution is approved based on BOTH dry_run flag AND approval file.
+    
+    Returns:
+        tuple: (is_approved, reason_message)
+    """
+    try:
+        settings = load_settings()
+        dry_run = settings.app.execution_dry_run
+    except Exception:
+        dry_run = True  # Default to safe mode if config fails
+    
+    approval_file_exists = APPROVAL_FILE.exists()
+    
+    if dry_run:
+        return False, "execution_dry_run=True in config (safety override)"
+    elif not approval_file_exists:
+        return False, "approval file missing (run 'make approve')"
+    else:
+        return True, "dry_run=False AND approval file exists"
 
 # Synthetic market data for demo (deterministic, idempotent)
 SYNTHETIC_TICKERS = [
@@ -293,12 +318,14 @@ async def main() -> None:
     print("🚀 AWET TRADING PIPELINE DEMO")
     print("=" * 60)
     
-    # Check approval status
-    approved = APPROVAL_FILE.exists()
+    # Check approval status (both dry_run AND approval file)
+    approved, reason = is_execution_approved()
     if approved:
-        print("🟢 Execution approval file EXISTS - trades will be FILLED")
+        print(f"🟢 Execution APPROVED - trades will be FILLED")
+        print(f"   Reason: {reason}")
     else:
-        print("🔴 Execution approval file MISSING - trades will be BLOCKED")
+        print(f"🔴 Execution BLOCKED - trades will NOT be filled")
+        print(f"   Reason: {reason}")
     
     # Generate correlation ID for this demo run
     correlation_id = str(uuid.uuid4())

@@ -1,0 +1,66 @@
+{
+  "type": "record",
+  "name": "SocialRedditEnriched",
+  "namespace": "com.awet.social.reddit",
+  "doc": "Enriched Reddit content with NLP entities, embeddings, and extracted tickers.",
+  "fields": [
+    {"name": "event_id",        "type": "string",  "doc": "UUID4 unique event identifier"},
+    {"name": "correlation_id",  "type": "string",  "doc": "UUID4 pipeline correlation id"},
+    {"name": "event_version",   "type": "int",     "default": 1, "doc": "Monotonic event version for idempotent replay"},
+    {"name": "produced_at_utc", "type": "string",  "doc": "RFC3339 UTC timestamp when this event was produced"},
+    {"name": "schema_version",  "type": "string",  "default": "social.reddit.enriched.v1", "doc": "Qualified schema version identifier"},
+    {"name": "source",          "type": "string",  "default": "reddit", "doc": "Must be 'reddit'"},
+    {
+      "name": "trace",
+      "type": {
+        "type": "record",
+        "name": "Trace",
+        "namespace": "com.awet.social.reddit.enriched",
+        "doc": "Distributed tracing metadata",
+        "fields": [
+          {"name": "service_name",    "type": "string",  "doc": "Name of the producing service"},
+          {"name": "host",            "type": "string",  "doc": "Hostname of the producing instance"},
+          {"name": "attempt",         "type": "int",     "default": 1, "doc": "Retry attempt counter (1 = first try)"},
+          {"name": "parent_event_id", "type": ["null", "string"], "default": null, "doc": "UUID of the upstream raw event"}
+        ]
+      }
+    },
+    {
+      "name": "payload",
+      "type": {
+        "type": "record",
+        "name": "RedditEnrichedPayload",
+        "namespace": "com.awet.social.reddit.enriched",
+        "doc": "Enriched NLP and embedding fields",
+        "fields": [
+          {"name": "source_id",              "type": "string",  "doc": "Stable identifier matching the raw event source_id"},
+          {"name": "cleaned_text",           "type": "string",  "doc": "Normalized, stripped plain text (no markdown, no URLs)"},
+          {"name": "chunk_ids",              "type": {"type": "array", "items": "string"}, "default": [], "doc": "Ordered list of chunk UUIDs produced by the text splitter"},
+          {
+            "name": "entities",
+            "type": {
+              "type": "array",
+              "items": {
+                "type": "record",
+                "name": "Entity",
+                "namespace": "com.awet.social.reddit.enriched",
+                "doc": "Named entity extracted from the text",
+                "fields": [
+                  {"name": "name",       "type": "string",  "doc": "Entity surface form"},
+                  {"name": "type",       "type": "string",  "doc": "Entity type (ORG, PERSON, TICKER, PRODUCT, …)"},
+                  {"name": "confidence", "type": "double",  "doc": "Model confidence [0.0, 1.0]"}
+                ]
+              }
+            },
+            "default": [],
+            "doc": "Named entities extracted by the NER model"
+          },
+          {"name": "tickers",                "type": {"type": "array", "items": "string"}, "default": [], "doc": "Ticker symbols extracted from text (e.g. ['AAPL', 'TSLA'])"},
+          {"name": "embedding_model",        "type": "string",  "doc": "Embedding model name (e.g. all-MiniLM-L6-v2)"},
+          {"name": "embedding_model_version","type": "string",  "doc": "Embedding model version or checkpoint hash"},
+          {"name": "content_hash",           "type": "string",  "doc": "SHA-256 of deterministic-normalized enrichment inputs"}
+        ]
+      }
+    }
+  ]
+}

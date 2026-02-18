@@ -1,0 +1,23 @@
+.git
+.github
+.venv
+.pytest_cache
+.ruff_cache
+.tmp
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Large local artifacts
+logs
+lightning_logs
+models
+superagi/workspace
+
+# Data and generated files
+*.csv
+*.parquet
+*.onnx
+*.ckpt
+*.pt

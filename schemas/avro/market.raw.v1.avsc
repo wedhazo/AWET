@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "MarketRaw",
+  "namespace": "com.awet.market",
+  "doc": "Raw OHLCV tick or bar ingested from market-data providers.",
+  "fields": [
+    {"name": "event_id",        "type": "string",  "doc": "UUID4 unique event identifier"},
+    {"name": "correlation_id",  "type": "string",  "doc": "UUID4 pipeline correlation id"},
+    {"name": "idempotency_key", "type": "string",  "doc": "Stable key for dedup on retry"},
+    {"name": "symbol",          "type": "string"},
+    {"name": "ts",              "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "UTC epoch ms"},
+    {"name": "open",            "type": "double"},
+    {"name": "high",            "type": "double"},
+    {"name": "low",             "type": "double"},
+    {"name": "close",           "type": "double"},
+    {"name": "volume",          "type": "long"},
+    {"name": "source",          "type": "string",  "doc": "Provider name, e.g. polygon, yfinance"},
+    {"name": "schema_version",  "type": "int",     "default": 1}
+  ]
+}

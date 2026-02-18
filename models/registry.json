@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-01-15T08:15:35.764326+00:00",
+  "updated_at": "2026-02-18T02:32:40.722891+00:00",
   "models": [
     {
       "model_id": "tft_20260115_081459_7f6cae3b_20260115_081535",
@@ -40,58 +40,79 @@
       "deprecated_at": null
     },
     {
+      "model_id": "tft_20260117_035006_ab98e94b_20260117_035019",
       "run_id": "20260117_035006_ab98e94b",
+      "status": "deprecated",
+      "onnx_path": "/home/kironix/Awet/models/tft/20260117_035006_ab98e94b/model.onnx",
+      "checkpoint_path": "/home/kironix/Awet/models/tft/20260117_035006_ab98e94b/model.pt",
       "created_at": "2026-01-17T03:50:19.239675+00:00",
-      "path": "models/tft/20260117_035006_ab98e94b",
-      "status": "candidate",
       "metrics": {
-        "val_loss": 8.765568638252193e-06,
         "train_loss": 1.2645561484790013e-05,
-        "epochs": 14
+        "val_loss": 8.765568638252193e-06,
+        "epochs": 14,
+        "samples": 0,
+        "train_duration_seconds": 0.0
       },
-      "hyperparams": {
+      "config": {
         "hidden_size": 32,
         "attention_heads": 2,
         "seq_length": 60,
         "batch_size": 256,
-        "learning_rate": 0.001
-      }
+        "learning_rate": 0.001,
+        "deprecated_reason": "incompatible_output_shape_1_vs_10"
+      },
+      "promoted_at": null,
+      "deprecated_at": "2026-02-18T02:32:40.722859+00:00"
     },
     {
+      "model_id": "tft_20260117_065324_885653e7_20260117_065335",
       "run_id": "20260117_065324_885653e7",
+      "status": "deprecated",
+      "onnx_path": "/home/kironix/Awet/models/tft/20260117_065324_885653e7/model.onnx",
+      "checkpoint_path": "/home/kironix/Awet/models/tft/20260117_065324_885653e7/model.pt",
       "created_at": "2026-01-17T06:53:35.658750+00:00",
-      "path": "models/tft/20260117_065324_885653e7",
-      "status": "candidate",
       "metrics": {
-        "val_loss": 8.843691563315704e-06,
         "train_loss": 1.2814511745828249e-05,
-        "epochs": 12
+        "val_loss": 8.843691563315704e-06,
+        "epochs": 12,
+        "samples": 0,
+        "train_duration_seconds": 0.0
       },
-      "hyperparams": {
+      "config": {
         "hidden_size": 32,
         "attention_heads": 2,
         "seq_length": 60,
         "batch_size": 256,
-        "learning_rate": 0.001
-      }
+        "learning_rate": 0.001,
+        "deprecated_reason": "incompatible_output_shape_1_vs_10"
+      },
+      "promoted_at": null,
+      "deprecated_at": "2026-02-18T02:32:40.722859+00:00"
     },
     {
+      "model_id": "tft_20260121_172948_2630a2df_20260121_172950",
       "run_id": "20260121_172948_2630a2df",
+      "status": "deprecated",
+      "onnx_path": "/home/kironix/Awet/models/tft/20260121_172948_2630a2df/model.onnx",
+      "checkpoint_path": "/home/kironix/Awet/models/tft/20260121_172948_2630a2df/model.pt",
       "created_at": "2026-01-21T17:29:50.826469+00:00",
-      "path": "models/tft/20260121_172948_2630a2df",
-      "status": "candidate",
       "metrics": {
-        "val_loss": 0.0040995879098773,
         "train_loss": 0.006249424535781145,
-        "epochs": 5
+        "val_loss": 0.0040995879098773,
+        "epochs": 5,
+        "samples": 0,
+        "train_duration_seconds": 0.0
       },
-      "hyperparams": {
+      "config": {
         "hidden_size": 32,
         "attention_heads": 2,
         "seq_length": 5,
         "batch_size": 256,
-        "learning_rate": 0.001
-      }
+        "learning_rate": 0.001,
+        "deprecated_reason": "incompatible_output_shape_1_vs_10"
+      },
+      "promoted_at": null,
+      "deprecated_at": "2026-02-18T02:32:40.722859+00:00"
     }
   ]
 }

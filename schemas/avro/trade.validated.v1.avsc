@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "TradeValidated",
+  "namespace": "com.awet.trade",
+  "doc": "Validated trade proposal that passed risk checks.",
+  "fields": [
+    {"name": "event_id",        "type": "string"},
+    {"name": "correlation_id",  "type": "string"},
+    {"name": "idempotency_key", "type": "string"},
+    {"name": "symbol",          "type": "string"},
+    {"name": "ts",              "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "direction",       "type": "string", "doc": "long | short"},
+    {"name": "quantity",        "type": "double"},
+    {"name": "limit_price",     "type": ["null", "double"], "default": null},
+    {"name": "order_type",      "type": "string", "default": "market"},
+    {"name": "source",          "type": "string", "default": "execution_agent"},
+    {"name": "schema_version",  "type": "int",    "default": 1}
+  ]
+}

@@ -35,6 +35,9 @@ PASSED=0
 FAILED=0
 WARNED=0
 
+# Kafka UI host port (supports remapped host ports in docker-compose)
+KAFKA_UI_PORT="${KAFKA_UI_PORT:-8080}"
+
 # Results array for JSON
 declare -a RESULTS=()
 
@@ -120,6 +123,12 @@ for svc in "${SUPERAGI_SERVICES[@]}"; do
     fi
 done
 
+# Detect mapped Kafka UI host port when available
+kafka_ui_port_from_docker=$(docker port kafka-ui 8080/tcp 2>/dev/null | head -1 | awk -F: '{print $NF}' || true)
+if [ -n "${kafka_ui_port_from_docker:-}" ]; then
+    KAFKA_UI_PORT="$kafka_ui_port_from_docker"
+fi
+
 # =============================================================================
 # 2. PORT USAGE
 # =============================================================================
@@ -130,7 +139,7 @@ declare -A EXPECTED_PORTS=(
     [3001]="SuperAGI"
     [5433]="TimescaleDB"
     [6379]="Redis"
-    [8080]="Kafka-UI"
+    ["$KAFKA_UI_PORT"]="Kafka-UI"
     [8081]="Schema-Registry"
     [8100]="SuperAGI-API"
     [9090]="Prometheus"
@@ -219,7 +228,7 @@ declare -A HEALTH_ENDPOINTS=(
     ["Grafana"]="http://localhost:3000/api/health"
     ["Alertmanager"]="http://localhost:9093/-/healthy"
     ["Schema-Registry"]="http://localhost:8081/subjects"
-    ["Kafka-UI"]="http://localhost:8080/api/clusters"
+    ["Kafka-UI"]="http://localhost:${KAFKA_UI_PORT}/api/clusters"
     ["SuperAGI"]="http://localhost:8100/health"
     ["Ollama"]="http://localhost:11434/api/tags"
 )
@@ -317,7 +326,7 @@ if [ "$QUIET" = false ] && [ "$JSON_OUTPUT" = false ]; then
     echo "  📊 Grafana:        http://localhost:3000  (admin/admin)"
     echo "  📈 Prometheus:     http://localhost:9090"
     echo "  🚨 Alertmanager:   http://localhost:9093"
-    echo "  📬 Kafka UI:       http://localhost:8080"
+    echo "  📬 Kafka UI:       http://localhost:${KAFKA_UI_PORT}"
     echo "  📋 Schema Registry: http://localhost:8081"
     echo "  🤖 SuperAGI:       http://localhost:3001"
     echo "  🧠 Ollama:         http://localhost:11434"

@@ -553,13 +553,9 @@ async def main() -> int:
     
     args = parser.parse_args()
     
-    # Configure logging
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.dev.ConsoleRenderer(),
-        ]
-    )
+    # Configure logging (centralized — keeps correlation_id + contextvars)
+    from src.core.logging import configure_logging
+    configure_logging("INFO", console=True)
     
     if args.eod:
         success = await run_eod_job()

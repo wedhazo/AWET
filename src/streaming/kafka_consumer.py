@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from typing import Any
 
 import structlog
 from confluent_kafka import KafkaError
+from confluent_kafka.deserializing_consumer import DeserializingConsumer
 from confluent_kafka.error import ConsumeError, KeyDeserializationError, ValueDeserializationError
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 from confluent_kafka.serialization import StringDeserializer
-from confluent_kafka.deserializing_consumer import DeserializingConsumer
 
 from src.core.config import KafkaConfig
+from src.streaming.dlq import DLQPublisher
 
 logger = logging.getLogger(__name__)
 log = structlog.get_logger("kafka_consumer")
@@ -32,7 +33,14 @@ def _on_revoke(consumer, partitions):
 
 
 class AvroConsumer:
-    def __init__(self, config: KafkaConfig, group_id: str, schema_str: str, topic: str) -> None:
+    def __init__(
+        self,
+        config: KafkaConfig,
+        group_id: str,
+        schema_str: str,
+        topic: str,
+        dlq_publisher: DLQPublisher | None = None,
+    ) -> None:
         self._schema_registry = SchemaRegistryClient({"url": config.schema_registry_url})
         self._consumer = DeserializingConsumer(
             {
@@ -51,6 +59,7 @@ class AvroConsumer:
         self._consumer.subscribe([topic], on_assign=_on_assign, on_revoke=_on_revoke)
         self._topic = topic
         self._deser_error_count = 0
+        self._dlq = dlq_publisher
         log.info("kafka_consumer_created", group=group_id, topic=topic)
 
     def poll(self, timeout: float = 1.0) -> Any | None:
@@ -64,6 +73,12 @@ class AvroConsumer:
                 topic=self._topic,
                 total_deser_errors=self._deser_error_count,
             )
+            if self._dlq is not None:
+                self._dlq.send(
+                    topic=self._topic,
+                    error=str(e),
+                    raw=getattr(e, "value", None) if hasattr(e, "value") else None,
+                )
             return None
         except ConsumeError as e:
             # Handle topic not ready errors gracefully

@@ -1,0 +1,64 @@
+{
+  "type": "record",
+  "name": "SocialRedditSummary",
+  "namespace": "com.awet.social.reddit",
+  "doc": "LLM-generated summary of enriched Reddit content with citations and risk flags.",
+  "fields": [
+    {"name": "event_id",        "type": "string",  "doc": "UUID4 unique event identifier"},
+    {"name": "correlation_id",  "type": "string",  "doc": "UUID4 pipeline correlation id"},
+    {"name": "event_version",   "type": "int",     "default": 1, "doc": "Monotonic event version for idempotent replay"},
+    {"name": "produced_at_utc", "type": "string",  "doc": "RFC3339 UTC timestamp when this event was produced"},
+    {"name": "schema_version",  "type": "string",  "default": "social.reddit.summary.v1", "doc": "Qualified schema version identifier"},
+    {"name": "source",          "type": "string",  "default": "reddit", "doc": "Must be 'reddit'"},
+    {
+      "name": "trace",
+      "type": {
+        "type": "record",
+        "name": "Trace",
+        "namespace": "com.awet.social.reddit.summary",
+        "doc": "Distributed tracing metadata",
+        "fields": [
+          {"name": "service_name",    "type": "string",  "doc": "Name of the producing service"},
+          {"name": "host",            "type": "string",  "doc": "Hostname of the producing instance"},
+          {"name": "attempt",         "type": "int",     "default": 1, "doc": "Retry attempt counter (1 = first try)"},
+          {"name": "parent_event_id", "type": ["null", "string"], "default": null, "doc": "UUID of the upstream enriched event"}
+        ]
+      }
+    },
+    {
+      "name": "payload",
+      "type": {
+        "type": "record",
+        "name": "RedditSummaryPayload",
+        "namespace": "com.awet.social.reddit.summary",
+        "doc": "LLM-generated summary fields",
+        "fields": [
+          {"name": "source_id",   "type": "string",  "doc": "Stable identifier matching the raw/enriched event source_id"},
+          {"name": "summary",     "type": "string",  "doc": "Concise LLM-generated summary of the content"},
+          {"name": "key_points",  "type": {"type": "array", "items": "string"}, "default": [], "doc": "Bullet-point key takeaways"},
+          {"name": "risks",       "type": {"type": "array", "items": "string"}, "default": [], "doc": "Identified risk signals or red flags"},
+          {
+            "name": "citations",
+            "type": {
+              "type": "array",
+              "items": {
+                "type": "record",
+                "name": "Citation",
+                "namespace": "com.awet.social.reddit.summary",
+                "doc": "Source citation linking summary claims to original content",
+                "fields": [
+                  {"name": "url",       "type": "string",  "doc": "Permalink to the source Reddit content"},
+                  {"name": "source_id", "type": "string",  "doc": "Stable source_id of the cited content"},
+                  {"name": "chunk_id",  "type": "string",  "doc": "UUID of the specific text chunk cited"}
+                ]
+              }
+            },
+            "default": [],
+            "doc": "Citations linking back to original Reddit posts/comments"
+          },
+          {"name": "content_hash", "type": "string",  "doc": "SHA-256 of deterministic-normalized summary inputs"}
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "type": "record",
+  "name": "DlqSocialReddit",
+  "namespace": "com.awet.dlq.social.reddit",
+  "doc": "Dead-letter envelope for failed social.reddit.* events. One schema covers dlq.social.reddit.raw, dlq.social.reddit.enriched, and dlq.social.reddit.summary.",
+  "fields": [
+    {"name": "event_id",            "type": "string",  "doc": "UUID4 of this DLQ envelope event"},
+    {"name": "correlation_id",      "type": "string",  "doc": "UUID4 correlation id of the failed pipeline run"},
+    {"name": "original_topic",      "type": "string",  "doc": "Kafka topic the failed event was destined for (e.g. social.reddit.raw)"},
+    {"name": "original_key",        "type": ["null", "string"], "default": null, "doc": "Original Kafka message key"},
+    {"name": "original_value",      "type": "bytes",   "doc": "Raw serialised payload of the failed event"},
+    {"name": "error_message",       "type": "string",  "doc": "Human-readable error description"},
+    {"name": "error_class",         "type": "string",  "doc": "Fully-qualified exception class name"},
+    {"name": "stack_trace",         "type": ["null", "string"], "default": null, "doc": "Abbreviated stack trace (max 4 KB)"},
+    {"name": "retry_count",         "type": "int",     "default": 0,  "doc": "Number of retries attempted before DLQ"},
+    {"name": "max_retries",         "type": "int",     "default": 3,  "doc": "Max retries configured for this consumer"},
+    {"name": "first_failed_at_utc", "type": "string",  "doc": "RFC3339 UTC timestamp of the first failure"},
+    {"name": "last_failed_at_utc",  "type": "string",  "doc": "RFC3339 UTC timestamp of the most recent failure"},
+    {"name": "source",              "type": "string",  "doc": "Service that produced the DLQ event"},
+    {"name": "schema_version",      "type": "string",  "default": "dlq.social.reddit.v1", "doc": "Qualified schema version identifier"}
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "type": "record",
+  "name": "SocialRedditRaw",
+  "namespace": "com.awet.social.reddit",
+  "doc": "Raw Reddit post or comment ingested from the Reddit API. One event per unique post/comment.",
+  "fields": [
+    {"name": "event_id",        "type": "string",  "doc": "UUID4 unique event identifier"},
+    {"name": "correlation_id",  "type": "string",  "doc": "UUID4 pipeline correlation id"},
+    {"name": "event_version",   "type": "int",     "default": 1, "doc": "Monotonic event version for idempotent replay"},
+    {"name": "produced_at_utc", "type": "string",  "doc": "RFC3339 UTC timestamp when this event was produced"},
+    {"name": "schema_version",  "type": "string",  "default": "social.reddit.raw.v1", "doc": "Qualified schema version identifier"},
+    {"name": "source",          "type": "string",  "default": "reddit", "doc": "Must be 'reddit'"},
+    {
+      "name": "trace",
+      "type": {
+        "type": "record",
+        "name": "Trace",
+        "namespace": "com.awet.social.reddit.raw",
+        "doc": "Distributed tracing metadata",
+        "fields": [
+          {"name": "service_name",    "type": "string",  "doc": "Name of the producing service"},
+          {"name": "host",            "type": "string",  "doc": "Hostname of the producing instance"},
+          {"name": "attempt",         "type": "int",     "default": 1, "doc": "Retry attempt counter (1 = first try)"},
+          {"name": "parent_event_id", "type": ["null", "string"], "default": null, "doc": "UUID of the upstream event that caused this event"}
+        ]
+      }
+    },
+    {
+      "name": "payload",
+      "type": {
+        "type": "record",
+        "name": "RedditRawPayload",
+        "namespace": "com.awet.social.reddit.raw",
+        "doc": "Raw Reddit content fields",
+        "fields": [
+          {"name": "source_id",      "type": "string",  "doc": "Stable identifier: reddit:{subreddit}:{post_id}[:{comment_id}]"},
+          {"name": "subreddit",      "type": "string",  "doc": "Subreddit name without r/ prefix (e.g. wallstreetbets)"},
+          {"name": "post_id",        "type": "string",  "doc": "Reddit post fullname (e.g. t3_abc123)"},
+          {"name": "comment_id",     "type": ["null", "string"], "default": null, "doc": "Reddit comment fullname if this is a comment (e.g. t1_xyz789)"},
+          {"name": "author_hash",    "type": "string",  "doc": "SHA-256 hash of the author username — no PII stored"},
+          {"name": "created_at_utc", "type": "string",  "doc": "RFC3339 UTC timestamp when the post/comment was created on Reddit"},
+          {"name": "title",          "type": "string",  "doc": "Post title (empty string for comments)"},
+          {"name": "body",           "type": "string",  "doc": "Selftext or comment body (Markdown)"},
+          {"name": "url",            "type": "string",  "doc": "Full permalink URL"},
+          {"name": "score",          "type": "int",     "default": 0, "doc": "Reddit score (upvotes minus downvotes) at fetch time"},
+          {"name": "num_comments",   "type": "int",     "default": 0, "doc": "Comment count (submissions only; 0 for comments)"},
+          {"name": "content_hash",   "type": "string",  "doc": "SHA-256 of deterministic-normalized(title + body + author_hash + created_at_utc)"},
+          {"name": "fetched_at_utc", "type": "string",  "doc": "RFC3339 UTC timestamp when this content was fetched from Reddit"}
+        ]
+      }
+    }
+  ]
+}

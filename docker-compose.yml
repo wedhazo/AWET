@@ -74,7 +74,7 @@ services:
       - kafka
       - schema-registry
     ports:
-      - "8080:8080"
+      - "${KAFKA_UI_PORT:-8080}:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: awet
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
@@ -336,7 +336,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://awet:awet@timescaledb:5432/awet
       - ALPACA_API_KEY=${ALPACA_API_KEY:-}
-      - ALPACA_API_SECRET=${ALPACA_API_SECRET:-}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY:-${ALPACA_API_SECRET:-}}
+      - ALPACA_API_SECRET=${ALPACA_API_SECRET:-${ALPACA_SECRET_KEY:-}}
       - ALPACA_PAPER=${ALPACA_PAPER:-true}
       - PYTHONUNBUFFERED=1
       - TZ=America/New_York
@@ -345,7 +346,7 @@ services:
       - ./logs:/app/logs
     working_dir: /app
     command: >
-      bash -c "pip install -q asyncpg structlog httpx pytz &&
+      bash -c "pip install -q asyncpg structlog httpx pytz prometheus-client fastapi &&
                python scripts/reconcile_scheduler.py --watch"
     restart: unless-stopped
     networks:
@@ -367,7 +368,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://awet:awet@timescaledb:5432/awet
       - ALPACA_API_KEY=${ALPACA_API_KEY:-}
-      - ALPACA_API_SECRET=${ALPACA_API_SECRET:-}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY:-${ALPACA_API_SECRET:-}}
+      - ALPACA_API_SECRET=${ALPACA_API_SECRET:-${ALPACA_SECRET_KEY:-}}
       - ALPACA_PAPER=${ALPACA_PAPER:-true}
       - PYTHONUNBUFFERED=1
       - TZ=America/New_York
@@ -376,12 +378,53 @@ services:
       - ./logs:/app/logs
     working_dir: /app
     command: >
-      bash -c "pip install -q asyncpg structlog httpx pytz &&
+      bash -c "pip install -q asyncpg structlog httpx pytz prometheus-client fastapi &&
                python scripts/reconcile_scheduler.py --eod"
     profiles:
       - eod
     networks:
       - awet
+
+  # ── Telegram Bot ────────────────────────────────────────────────────────────
+  telegram-bot:
+    build:
+      context: ./services/telegram-bot
+      dockerfile: Dockerfile
+    image: awet/telegram-bot:latest
+    container_name: telegram-bot
+    restart: unless-stopped
+    depends_on:
+      - kb-query
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - KB_QUERY_BASE_URL=http://kb-query:8000
+      - HTTP_TIMEOUT_SEC=${TELEGRAM_HTTP_TIMEOUT_SEC:-5}
+      - HTTP_MAX_RETRIES=${TELEGRAM_HTTP_MAX_RETRIES:-3}
+      - DEFAULT_LIMIT=${TELEGRAM_DEFAULT_LIMIT:-5}
+      - MAX_LIMIT=${TELEGRAM_MAX_LIMIT:-50}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - METRICS_PORT=9200
+      - STATE_FILE=/var/lib/telegram-bot/state.json
+      - RATE_LIMIT_MESSAGES_PER_SEC=${TELEGRAM_RATE_LIMIT:-1.0}
+      # LLM: set LLM_PROVIDER=anthropic|kimi|openai and LLM_API_KEY
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_TIMEOUT_SEC=${LLM_TIMEOUT_SEC:-30}
+      - LLM_RAG_LIMIT=${LLM_RAG_LIMIT:-5}
+    volumes:
+      - telegram_bot_state:/var/lib/telegram-bot
+    ports:
+      - "${TELEGRAM_METRICS_PORT:-9200}:9200"
+    networks:
+      - awet
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9200/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - telegram
 
 networks:
   awet:
@@ -389,6 +432,7 @@ networks:
 
 volumes:
   kafka_data:
+  telegram_bot_state:
   timescaledb_data:
   redis_data:
   prometheus_data:

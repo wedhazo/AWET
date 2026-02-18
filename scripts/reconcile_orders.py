@@ -266,13 +266,9 @@ async def main() -> None:
     
     args = parser.parse_args()
     
-    # Configure logging
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.dev.ConsoleRenderer(),
-        ]
-    )
+    # Configure logging (centralized — keeps correlation_id + contextvars)
+    from src.core.logging import configure_logging
+    configure_logging("INFO", console=True)
     
     if args.watch:
         await watch_orders(interval=args.interval, dry_run=args.dry_run)

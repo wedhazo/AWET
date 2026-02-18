@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, Gauge, CollectorRegistry, generate_latest
-from fastapi import Response
+
+try:
+    from fastapi import Response
+except ImportError:  # pragma: no cover - optional in non-HTTP runtimes
+    Response = None  # type: ignore[assignment]
 
 REGISTRY = CollectorRegistry()
 
@@ -115,5 +119,7 @@ PORTFOLIO_VALUE = Gauge(
 
 
 def metrics_response() -> Response:
-    return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
-
+    payload = generate_latest(REGISTRY)
+    if Response is None:
+        return payload  # type: ignore[return-value]
+    return Response(payload, media_type=CONTENT_TYPE_LATEST)

@@ -4,7 +4,12 @@ import asyncio
 import os
 
 import structlog
-from confluent_kafka.admin import AdminClient, ConsumerGroupTopicPartitions
+from confluent_kafka.admin import AdminClient
+
+try:
+    from confluent_kafka.admin import ConsumerGroupTopicPartitions
+except ImportError:
+    from confluent_kafka.admin import _ConsumerGroupTopicPartitions as ConsumerGroupTopicPartitions
 
 from src.agents.base_agent import BaseAgent
 from src.core.config import load_settings

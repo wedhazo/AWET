@@ -9,5 +9,21 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .env
+.env.*
+!.env.example
 .tmp/
 *.log
+
+# Local env backups / secrets
+.env.backup
+.env.bak
+
+# Model artifacts (keep registry.json tracked)
+models/tft/
+models/**/*.bak
+
+# Scratch files accidentally created from terminal output
+ql -h*
+t='localhost'*
+yncio, asyncpg, os
+')

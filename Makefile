@@ -2,7 +2,7 @@ VENV=.venv
 PYTHON=$(VENV)/bin/python
 PIP=$(VENV)/bin/pip
 
-.PHONY: setup setup-ml lint typecheck test up down demo backfill train infer demo-real approve revoke llm-test
+.PHONY: setup setup-ml lint typecheck test up down demo backfill train infer demo-real approve revoke llm-test replay replay-last replay-test
 
 setup:
 	python -m venv $(VENV)
@@ -20,6 +20,23 @@ typecheck:
 
 test:
 	$(VENV)/bin/pytest
+
+schema-check:
+	$(VENV)/bin/python scripts/check_schema_compatibility.py --schemas-dir schemas/avro src/schemas
+
+# Deterministic Replay Engine
+replay:
+	$(PYTHON) scripts/replay_pipeline.py $(ARGS)
+
+replay-last:
+	@cid=$$(PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -A -t -c \
+	  "SELECT correlation_id FROM audit_events WHERE source='synthetic_demo' ORDER BY created_at DESC LIMIT 1"); \
+	if [ -z "$$cid" ]; then echo "No demo run in audit_events"; exit 1; fi; \
+	echo "Replaying correlation_id=$$cid"; \
+	$(PYTHON) scripts/replay_pipeline.py --correlation-id "$$cid" --json-report
+
+replay-test:
+	$(VENV)/bin/pytest tests/integration/test_replay_determinism.py -v
 
 up:
 	docker compose up -d
@@ -314,6 +331,24 @@ exit-on:
 exit-off:
 	@sed -i 's/enable_exit_logic: true/enable_exit_logic: false/' config/app.yaml
 	@echo "🚫 Exit logic DISABLED"
+
+# =============================================
+# Telegram Bot (with local Ollama)
+# =============================================
+telegram-bot-local:
+	@echo "🤖 Starting AWET Telegram Bot with local Ollama..."
+	@echo "   Model: llama3.2:1b"
+	@echo "   Bot: @$$(grep TELEGRAM_BOT_TOKEN .env | cut -d'=' -f2 | cut -d':' -f1 || echo 'unknown')"
+	@echo ""
+	cd services/telegram-bot && \
+	export $$(grep -v '^#' ../../.env | xargs) && \
+	export KB_QUERY_BASE_URL=http://localhost:8000 && \
+	export METRICS_PORT=9201 && \
+	export STATE_FILE=/tmp/awet-telegram-bot-state.json && \
+	python -m telegram_bot.main
+
+telegram-bot-test:
+	@export $$(grep -v '^#' .env | xargs) && python3 test_telegram_bot.py
 
 # =============================================
 # PnL Reporting (Performance Reporting v1)

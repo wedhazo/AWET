@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "ExecReport",
+  "namespace": "com.awet.execution",
+  "doc": "Execution report after a paper (or live) trade is placed.",
+  "fields": [
+    {"name": "event_id",        "type": "string"},
+    {"name": "correlation_id",  "type": "string"},
+    {"name": "idempotency_key", "type": "string"},
+    {"name": "symbol",          "type": "string"},
+    {"name": "ts",              "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "order_id",        "type": "string"},
+    {"name": "fill_price",      "type": "double"},
+    {"name": "fill_qty",        "type": "double"},
+    {"name": "status",          "type": {"type": "enum", "name": "ExecStatus", "symbols": ["filled", "partial", "rejected", "cancelled"]}},
+    {"name": "paper",           "type": "boolean", "default": true},
+    {"name": "source",          "type": "string", "default": "execution_agent"},
+    {"name": "schema_version",  "type": "int",    "default": 1}
+  ]
+}

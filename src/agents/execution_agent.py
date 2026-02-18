@@ -187,10 +187,11 @@ class ExecutionAgent(BaseAgent):
                     await asyncio.sleep(0.1)
                     continue
                 await self._process_message(msg)
-            except Exception:
+            except Exception as e:
                 self.logger.exception(
                     "execution_processing_error",
                     message="Exception in consume loop - continuing",
+                    error=str(e),
                 )
                 await asyncio.sleep(1.0)
           except asyncio.CancelledError:

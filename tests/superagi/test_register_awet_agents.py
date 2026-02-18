@@ -1,3 +1,4 @@
+import json
 import os
 
 import responses
@@ -41,7 +42,8 @@ def test_registers_agent_team(monkeypatch):
     created_payloads = []
 
     def _create_callback(request):
-        created_payloads.append(request.json())
+        body = request.body if isinstance(request.body, str) else request.body.decode("utf-8")
+        created_payloads.append(json.loads(body))
         return (201, {"Content-Type": "application/json"}, "{\"id\": 10}")
 
     responses.add_callback(

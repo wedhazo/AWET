@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY . /app
+
+# Install runtime deps once so agent containers can start quickly.
+RUN pip install --no-cache-dir -e .
+
+ENV PYTHONUNBUFFERED=1
+
+# Overridden per container with explicit module command.
+CMD ["python", "-m", "src.agents.data_ingestion"]

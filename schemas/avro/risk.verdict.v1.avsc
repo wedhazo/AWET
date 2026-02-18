@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "RiskVerdict",
+  "namespace": "com.awet.risk",
+  "doc": "Risk engine verdict — approve or reject a proposed trade.",
+  "fields": [
+    {"name": "event_id",        "type": "string"},
+    {"name": "correlation_id",  "type": "string"},
+    {"name": "idempotency_key", "type": "string"},
+    {"name": "symbol",          "type": "string"},
+    {"name": "ts",              "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "approved",        "type": "boolean"},
+    {"name": "reasons",         "type": {"type": "array", "items": "string"}, "doc": "Human-readable reasons for decision"},
+    {"name": "max_position_usd","type": "double",  "doc": "Max allowed position size in USD"},
+    {"name": "source",          "type": "string",  "default": "risk_engine"},
+    {"name": "schema_version",  "type": "int",     "default": 1}
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "AuditEvent",
+  "namespace": "com.awet.audit",
+  "doc": "Generic audit trail event written at every pipeline stage.",
+  "fields": [
+    {"name": "event_id",        "type": "string"},
+    {"name": "correlation_id",  "type": "string"},
+    {"name": "idempotency_key", "type": "string"},
+    {"name": "symbol",          "type": ["null", "string"], "default": null},
+    {"name": "ts",              "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "stage",           "type": "string", "doc": "Pipeline stage: ingestion | features | prediction | risk | execution"},
+    {"name": "outcome",         "type": "string", "doc": "success | failure | skipped"},
+    {"name": "detail",          "type": ["null", "string"], "default": null, "doc": "Free-form JSON detail blob"},
+    {"name": "source",          "type": "string"},
+    {"name": "schema_version",  "type": "int",    "default": 1}
+  ]
+}

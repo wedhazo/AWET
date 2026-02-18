@@ -553,13 +553,17 @@ class TradesRepository:
             return None
         
         async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT qty FROM positions WHERE symbol = $1",
-                symbol.upper(),
-            )
-            if row:
-                return int(float(row["qty"]))
-            return None
+            try:
+                row = await conn.fetchrow(
+                    "SELECT qty FROM positions WHERE symbol = $1",
+                    symbol.upper(),
+                )
+                if row:
+                    return int(float(row["qty"]))
+                return None
+            except asyncpg.exceptions.UndefinedTableError:
+                logger.warning("positions_table_missing", method="get_position_qty")
+                return None
 
     async def get_total_exposure(self) -> float:
         """
@@ -572,10 +576,14 @@ class TradesRepository:
             return 0.0
         
         async with self._pool.acquire() as conn:
-            total = await conn.fetchval(
-                "SELECT COALESCE(SUM(market_value), 0) FROM positions WHERE qty > 0"
-            )
-            return float(total or 0)
+            try:
+                total = await conn.fetchval(
+                    "SELECT COALESCE(SUM(market_value), 0) FROM positions WHERE qty > 0"
+                )
+                return float(total or 0)
+            except asyncpg.exceptions.UndefinedTableError:
+                logger.warning("positions_table_missing", method="get_total_exposure")
+                return 0.0
 
     async def get_symbol_exposure(self, symbol: str) -> float:
         """
@@ -591,11 +599,15 @@ class TradesRepository:
             return 0.0
         
         async with self._pool.acquire() as conn:
-            mv = await conn.fetchval(
-                "SELECT COALESCE(market_value, 0) FROM positions WHERE symbol = $1 AND qty > 0",
-                symbol.upper(),
-            )
-            return float(mv or 0)
+            try:
+                mv = await conn.fetchval(
+                    "SELECT COALESCE(market_value, 0) FROM positions WHERE symbol = $1 AND qty > 0",
+                    symbol.upper(),
+                )
+                return float(mv or 0)
+            except asyncpg.exceptions.UndefinedTableError:
+                logger.warning("positions_table_missing", method="get_symbol_exposure")
+                return 0.0
 
 
 def get_trades_repository(settings) -> TradesRepository:

@@ -1,0 +1,40 @@
+# docker-compose.reddit-ingestor.yml
+# Merge with main compose:  docker-compose -f docker-compose.yml -f services/reddit-ingestor/docker-compose.reddit-ingestor.yml up reddit-ingestor
+# Or add the service block to docker-compose.yml directly.
+
+services:
+  reddit-ingestor:
+    build:
+      context: .
+      dockerfile: services/reddit-ingestor/Dockerfile
+    container_name: reddit-ingestor
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - REDIS_URL=redis://redis:6379/0
+      - SUBREDDITS=wallstreetbets,stocks,investing
+      - POLL_INTERVAL_SEC=60
+      - REDDIT_PROVIDER=stub
+      - HTTP_PORT=8090
+      - LOG_LEVEL=20
+    ports:
+      - "8090:8090"
+    networks:
+      - awet
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/healthz')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+networks:
+  awet:
+    external: true

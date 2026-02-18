@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "SignalPrediction",
+  "namespace": "com.awet.signals",
+  "doc": "TFT model prediction output — multi-horizon quantile forecasts.",
+  "fields": [
+    {"name": "event_id",        "type": "string"},
+    {"name": "correlation_id",  "type": "string"},
+    {"name": "idempotency_key", "type": "string"},
+    {"name": "symbol",          "type": "string"},
+    {"name": "ts",              "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "model_id",        "type": "string",  "doc": "run_id of the model that produced the signal"},
+    {"name": "direction",       "type": {"type": "enum", "name": "Direction", "symbols": ["long", "short", "flat"]}},
+    {"name": "confidence",      "type": "double"},
+    {"name": "quantiles",       "type": {"type": "array", "items": "double"}, "doc": "Flattened [h0_q10, h0_q50, h0_q90, …]"},
+    {"name": "source",          "type": "string", "default": "prediction_agent"},
+    {"name": "schema_version",  "type": "int",    "default": 1}
+  ]
+}

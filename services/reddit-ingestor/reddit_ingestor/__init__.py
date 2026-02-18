@@ -1,0 +1,1 @@
+"""Reddit Ingestor source package."""

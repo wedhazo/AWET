@@ -2,12 +2,18 @@
 """
 Generate predictions from the latest trained model.
 
-Reads from: features_tft or market_raw_day (TimescaleDB)
-Writes to:  predictions_tft (TimescaleDB)
+Reads from:  features_tft or market_raw_day (TimescaleDB)
+Writes to:   predictions_tft (TimescaleDB)
+
+Modes:
+  --use-synthetic   Generate random predictions for smoke tests.
+  (default)         Load the green ONNX model via ONNXInferenceEngine
+                    and run real inference on a lookback window of
+                    engineered features.
 
 Usage:
     python scripts/predict.py --symbols AAPL --start 2024-01-01 --end 2024-01-31
-    python scripts/predict.py --symbols AAPL,MSFT --use-synthetic  # Generate synthetic predictions
+    python scripts/predict.py --symbols AAPL,MSFT --use-synthetic
 """
 from __future__ import annotations
 
@@ -17,11 +23,12 @@ import json
 import os
 import random
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 import asyncpg
+import numpy as np
 import structlog
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +36,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.core.logging import configure_logging
+from src.ml.onnx_engine import ONNXInferenceEngine
 
 logger = structlog.get_logger("predict")
 
@@ -67,6 +75,63 @@ def _get_latest_model(registry: dict) -> dict | None:
     return None
 
 
+def _load_engine() -> ONNXInferenceEngine | None:
+    """Load the ONNX inference engine with the green model.
+
+    Returns None if no usable model exists (caller should fall back to
+    synthetic or stub predictions).
+    """
+    engine = ONNXInferenceEngine(use_registry=True)
+    if engine.load_model():
+        logger.info(
+            "onnx_engine_ready",
+            model_path=engine.model_path,
+            model_version=engine.model_version,
+            lookback=engine.lookback_window,
+            num_features=engine.num_features,
+        )
+        return engine
+    logger.warning("onnx_engine_load_failed")
+    return None
+
+
+async def _fetch_feature_window(
+    conn: asyncpg.Connection,
+    symbol: str,
+    ts: datetime,
+    feature_cols: list[str],
+    lookback: int,
+) -> np.ndarray | None:
+    """Fetch `lookback` rows of features ending at `ts` for `symbol`.
+
+    Returns an ndarray of shape (lookback, num_features) or None if
+    insufficient data.
+    """
+    col_list = ", ".join(feature_cols)
+    rows = await conn.fetch(
+        f"""
+        SELECT {col_list}
+        FROM features_tft
+        WHERE ticker = $1 AND ts <= $2
+        ORDER BY ts DESC
+        LIMIT $3
+        """,
+        symbol,
+        ts,
+        lookback,
+    )
+    if len(rows) < lookback:
+        return None
+
+    # rows are newest-first; reverse to oldest-first
+    rows = list(reversed(rows))
+    window = np.array(
+        [[float(row[c]) if row[c] is not None else 0.0 for c in feature_cols] for row in rows],
+        dtype=np.float32,
+    )
+    return window
+
+
 async def generate_predictions(
     conn: asyncpg.Connection,
     symbols: list[str],
@@ -74,14 +139,25 @@ async def generate_predictions(
     end: datetime,
     model_version: str,
     use_synthetic: bool = False,
+    engine: ONNXInferenceEngine | None = None,
 ) -> int:
     """Generate predictions for given symbols and date range."""
     inserted = 0
     correlation_id = uuid4()
 
+    # Determine feature columns and lookback from the engine
+    feature_cols: list[str] = []
+    lookback: int = 60
+    if engine is not None:
+        feature_cols = engine.feature_columns
+        lookback = engine.lookback_window
+
     for symbol in symbols:
-        # Prefer engineered features if available
-        rows = await conn.fetch(
+        # ------------------------------------------------------------
+        # Fetch timestamp list to predict on
+        # Prefer engineered features, fall back to market_raw_day
+        # ------------------------------------------------------------
+        ts_rows = await conn.fetch(
             """
             SELECT ts, price
             FROM features_tft
@@ -93,8 +169,8 @@ async def generate_predictions(
             end,
         )
 
-        if not rows:
-            rows = await conn.fetch(
+        if not ts_rows:
+            ts_rows = await conn.fetch(
                 """
                 SELECT ts, close as price
                 FROM market_raw_day
@@ -106,30 +182,69 @@ async def generate_predictions(
                 end,
             )
 
-        if not rows:
+        if not ts_rows:
             logger.warning("no_market_data", symbol=symbol)
             continue
 
-        for row in rows:
+        # Pre-log for traceability
+        logger.info(
+            "predicting",
+            symbol=symbol,
+            rows=len(ts_rows),
+            mode="synthetic" if use_synthetic else ("onnx" if engine else "stub"),
+        )
+
+        for row in ts_rows:
             ts = row["ts"]
             close = float(row["price"])
 
             if use_synthetic:
                 # Generate synthetic predictions with some signal
-                base_return = random.gauss(0.001, 0.02)  # Slight positive bias
+                base_return = random.gauss(0.001, 0.02)
                 q10 = base_return - 0.015
                 q50 = base_return
                 q90 = base_return + 0.015
                 confidence = random.uniform(0.5, 0.9)
-                direction = "long" if q50 > 0.003 else ("short" if q50 < -0.003 else "neutral")
+                direction = (
+                    "long" if q50 > 0.003
+                    else ("short" if q50 < -0.003 else "neutral")
+                )
+                horizon_minutes = 1440
+            elif engine is not None:
+                # ── Real ONNX inference ────────────────────────────
+                window = await _fetch_feature_window(
+                    conn, symbol, ts, feature_cols, lookback,
+                )
+                if window is None:
+                    logger.debug(
+                        "insufficient_lookback",
+                        symbol=symbol,
+                        ts=str(ts),
+                        lookback=lookback,
+                    )
+                    continue
+
+                pred = engine.predict(symbol, features=window)
+                if pred is None:
+                    logger.warning("onnx_predict_none", symbol=symbol, ts=str(ts))
+                    continue
+
+                # Use the first horizon's quantiles for the DB row
+                first_horizon = engine.horizons[0]
+                q10 = pred.get(f"horizon_{first_horizon}_q10", -0.005)
+                q50 = pred.get(f"horizon_{first_horizon}_q50", 0.0)
+                q90 = pred.get(f"horizon_{first_horizon}_q90", 0.005)
+                confidence = pred.get("confidence", 0.5)
+                direction = pred.get("direction", "neutral")
+                horizon_minutes = first_horizon
             else:
-                # Placeholder for real model inference
-                # In production, this would load the ONNX model and run inference
+                # Stub — no model available, emit neutral
                 q50 = 0.0
                 q10 = -0.01
                 q90 = 0.01
                 confidence = 0.5
                 direction = "neutral"
+                horizon_minutes = 1440
 
             event_id = uuid4()
             idempotency_key = f"{symbol}:{ts.isoformat()}:{model_version}"
@@ -147,7 +262,7 @@ async def generate_predictions(
                 idempotency_key,
                 symbol,
                 ts,
-                1440,  # Daily horizon
+                horizon_minutes,
                 direction,
                 confidence,
                 q10,
@@ -194,6 +309,16 @@ async def main() -> int:
         else:
             model_version = "synthetic" if args.use_synthetic else "unknown"
 
+    # Load ONNX engine (unless synthetic mode)
+    engine: ONNXInferenceEngine | None = None
+    if not args.use_synthetic:
+        engine = _load_engine()
+        if engine is None:
+            logger.warning(
+                "no_model_available",
+                hint="pass --use-synthetic or train a model first",
+            )
+
     dsn = (
         f"postgresql://{_env('POSTGRES_USER', 'awet')}:{_env('POSTGRES_PASSWORD', 'awet')}"
         f"@{_env('POSTGRES_HOST', 'localhost')}:{_env('POSTGRES_PORT', '5433')}"
@@ -211,6 +336,7 @@ async def main() -> int:
                 end,
                 model_version,
                 use_synthetic=args.use_synthetic,
+                engine=engine,
             )
 
             logger.info(
@@ -220,6 +346,7 @@ async def main() -> int:
                 end=str(end),
                 model_version=model_version,
                 rows=inserted,
+                mode="synthetic" if args.use_synthetic else ("onnx" if engine else "stub"),
             )
             print(f"Inserted {inserted} prediction rows (model: {model_version})")
 

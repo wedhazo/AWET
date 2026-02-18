@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "MarketFeatures",
+  "namespace": "com.awet.market",
+  "doc": "Engineered feature vector produced by the feature-engineering agent.",
+  "fields": [
+    {"name": "event_id",        "type": "string"},
+    {"name": "correlation_id",  "type": "string"},
+    {"name": "idempotency_key", "type": "string"},
+    {"name": "symbol",          "type": "string"},
+    {"name": "ts",              "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "features",        "type": {"type": "map", "values": "double"}, "doc": "Feature name → value"},
+    {"name": "source",          "type": "string", "default": "feature_engine"},
+    {"name": "schema_version",  "type": "int",    "default": 1}
+  ]
+}

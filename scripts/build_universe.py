@@ -414,13 +414,9 @@ async def main() -> int:
     # Volume threshold
     min_volume = args.min_volume
     
-    # Configure logging
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.dev.ConsoleRenderer(),
-        ]
-    )
+    # Configure logging (centralized — keeps correlation_id + contextvars)
+    from src.core.logging import configure_logging
+    configure_logging("INFO", console=True)
     
     print()
     print("=" * 70)

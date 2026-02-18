@@ -287,9 +287,34 @@ class ModelRegistry:
         logger.info("model_deleted", model_id=model_id)
         return True
     
+    @staticmethod
+    def _check_onnx_output_compat(onnx_path: str, expected_outputs: int = 10) -> bool:
+        """Verify the ONNX model output dimension matches the pipeline.
+
+        The inference engine expects ``[batch, expected_outputs]`` where
+        the default 10 = 3 horizons × 3 quantiles + 1 confidence.
+        """
+        try:
+            import onnxruntime as ort
+
+            sess = ort.InferenceSession(onnx_path)
+            out_shape = sess.get_outputs()[0].shape
+            n_out = out_shape[1] if len(out_shape) > 1 and isinstance(out_shape[1], int) else -1
+            return n_out == expected_outputs
+        except Exception as exc:
+            logger.warning("onnx_compat_check_failed", path=onnx_path, error=str(exc))
+            return False
+
     def auto_promote_best(self, min_samples: int = 1000) -> ModelEntry | None:
         """Auto-promote best candidate model if it beats current green.
-        
+
+        Candidates are only eligible when:
+        1. They have at least ``min_samples`` training samples.
+        2. Their ONNX output shape is compatible with the inference
+           pipeline (10 outputs by default).
+        3. Their validation loss is strictly lower than the current
+           green model's.
+
         Args:
             min_samples: Minimum training samples required
             
@@ -298,6 +323,19 @@ class ModelRegistry:
         """
         candidates = self.list_models(status=ModelStatus.CANDIDATE)
         candidates = [c for c in candidates if c.metrics.samples >= min_samples]
+
+        # Filter out models with incompatible ONNX output dimensions
+        compat_candidates = []
+        for c in candidates:
+            if Path(c.onnx_path).exists() and self._check_onnx_output_compat(c.onnx_path):
+                compat_candidates.append(c)
+            else:
+                logger.info(
+                    "candidate_incompatible_output",
+                    model_id=c.model_id,
+                    onnx_path=c.onnx_path,
+                )
+        candidates = compat_candidates
         
         if not candidates:
             logger.info("no_eligible_candidates", min_samples=min_samples)

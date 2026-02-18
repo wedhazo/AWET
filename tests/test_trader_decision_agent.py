@@ -1,22 +1,26 @@
-from src.agents.trader_decision_agent import LruDedupSet, decide_trade
+from src.agents.trader_decision_agent import LruDedupSet, _decision_reason
+from src.core.trade_decision import DecisionThresholds, decide_trade_v2
 
 
 def test_long_high_confidence_buy() -> None:
-    decision, reason = decide_trade("long", 0.9, 0.65)
+    thresholds = DecisionThresholds(min_confidence=0.65)
+    decision = decide_trade_v2({"direction": "long", "confidence": 0.9}, thresholds)
     assert decision == "BUY"
-    assert reason == "long_signal_confident"
+    assert _decision_reason(decision) == "long_signal_confident"
 
 
 def test_short_high_confidence_sell() -> None:
-    decision, reason = decide_trade("short", 0.9, 0.65)
+    thresholds = DecisionThresholds(min_confidence=0.65)
+    decision = decide_trade_v2({"direction": "short", "confidence": 0.9}, thresholds)
     assert decision == "SELL"
-    assert reason == "short_signal_confident"
+    assert _decision_reason(decision) == "short_signal_confident"
 
 
 def test_low_confidence_hold() -> None:
-    decision, reason = decide_trade("long", 0.4, 0.65)
+    thresholds = DecisionThresholds(min_confidence=0.65)
+    decision = decide_trade_v2({"direction": "long", "confidence": 0.4}, thresholds)
     assert decision == "HOLD"
-    assert reason == "insufficient_confidence_or_neutral"
+    assert _decision_reason(decision) == "insufficient_confidence_or_neutral"
 
 
 def test_idempotency_dedup_drops_duplicate() -> None:

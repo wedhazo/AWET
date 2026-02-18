@@ -100,12 +100,10 @@ class TestCheckToolGateway:
         """Test gateway check with mock success."""
         from execution.register_superagi_tools import check_tool_gateway
         
-        with patch("httpx.Client") as MockClient:
-            mock_instance = MagicMock()
+        with patch("execution.register_superagi_tools.requests.get") as mock_get:
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_instance.get.return_value = mock_response
-            MockClient.return_value = mock_instance
+            mock_get.return_value = mock_response
             
             result = check_tool_gateway("http://localhost:8200")
             assert result is True

@@ -56,6 +56,12 @@ jobs:
         run: mypy src/ --ignore-missing-imports
         continue-on-error: true
 
+      - name: Check Avro schema compatibility
+        run: python scripts/check_schema_compatibility.py --schemas-dir schemas/avro src/schemas
+
+      - name: Run schema contract tests
+        run: pytest tests/unit/test_schema_contracts.py -v
+
   # ---------------------------------------------------------------------------
   # Unit Tests
   # ---------------------------------------------------------------------------
@@ -148,7 +154,207 @@ jobs:
         run: |
           pytest tests/integration/ -v --timeout=120
         continue-on-error: true
-      
+
+      - name: Validate replay JSON contract
+        run: |
+          set -euo pipefail
+
+          # 1. Retrieve the latest synthetic_demo correlation_id.
+          CID=$(PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -A -t -c "
+            SELECT correlation_id
+            FROM audit_events
+            WHERE source = 'synthetic_demo'
+            ORDER BY created_at DESC
+            LIMIT 1
+          ")
+
+          if [ -z "$CID" ]; then
+            echo "::error::No synthetic_demo correlation_id found in audit_events"
+            exit 1
+          fi
+
+          echo "Replaying correlation_id=$CID"
+
+          # 2. Run replay in JSON mode — stderr discarded, stdout captured.
+          OUTPUT=$(python scripts/replay_pipeline.py \
+            --correlation-id "$CID" --json-report 2>/dev/null)
+
+          # 3. Fail if stdout is empty.
+          if [ -z "$OUTPUT" ]; then
+            echo "::error::Replay produced empty stdout"
+            exit 1
+          fi
+
+          # 4. Validate stdout is strict JSON.
+          echo "$OUTPUT" | python -m json.tool > /dev/null
+
+          # 5. Zero-event path must also produce valid JSON.
+          ZERO_OUTPUT=$(python scripts/replay_pipeline.py \
+            --correlation-id 00000000-0000-0000-0000-000000000000 \
+            --json-report 2>/dev/null)
+
+          if [ -z "$ZERO_OUTPUT" ]; then
+            echo "::error::Zero-event replay produced empty stdout"
+            exit 1
+          fi
+
+          echo "$ZERO_OUTPUT" | python -m json.tool > /dev/null
+
+      - name: Validate replay deterministic invariants
+        run: |
+          set -euo pipefail
+
+          # --- 1. correlation_id=None must be rejected ---
+          echo "::group::Guard: correlation_id required"
+          # Replay with no --correlation-id and no --start-ts/--end-ts must fail.
+          if python scripts/replay_pipeline.py --json-report 2>/dev/null; then
+            echo "::error::Replay without --correlation-id should have failed"
+            exit 1
+          fi
+          echo "PASS: replay rejects missing correlation_id"
+          echo "::endgroup::"
+
+          # --- 2. Duplicate prediction rows must be detected ---
+          echo "::group::Guard: duplicate predictions detected"
+          TEST_CID="ci-guard-$(uuidgen)"
+          TEST_IKEY="ci-guard-ikey-$$"
+          TS1="2099-06-01 00:00:00+00"
+          TS2="2099-06-01 00:00:01+00"
+
+          # Insert two predictions with same correlation_id but different ts
+          PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -A -t -c "
+            INSERT INTO predictions_tft
+              (ticker, ts, direction, confidence, q10, q50, q90,
+               model_version, correlation_id, idempotency_key, created_at)
+            VALUES
+              ('CITEST', '$TS1', 'long', 0.8, -0.01, 0.02, 0.05,
+               'v-ci', '$TEST_CID', '$TEST_IKEY', now()),
+              ('CITEST', '$TS2', 'long', 0.8, -0.01, 0.02, 0.05,
+               'v-ci', '$TEST_CID', '$TEST_IKEY', now())
+            ON CONFLICT DO NOTHING;
+          "
+
+          # Insert a matching audit event
+          PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -A -t -c "
+            INSERT INTO audit_events
+              (event_id, correlation_id, idempotency_key, symbol,
+               ts, schema_version, source, event_type, payload)
+            VALUES
+              ('$(uuidgen)', '$TEST_CID', '$TEST_IKEY', 'CITEST',
+               '$TS1', 1, 'ci_guard', 'predictions.tft',
+               '{\"direction\":\"long\",\"confidence\":0.8,\"q10\":-0.01,\"q50\":0.02,\"q90\":0.05,\"model_version\":\"v-ci\",\"event_id\":\"x\",\"correlation_id\":\"$TEST_CID\",\"idempotency_key\":\"$TEST_IKEY\",\"symbol\":\"CITEST\"}')
+            ON CONFLICT DO NOTHING;
+          "
+
+          # Replay must fail
+          if python scripts/replay_pipeline.py \
+              --correlation-id "$TEST_CID" --json-report 2>/dev/null; then
+            echo "::error::Replay should have failed on duplicate predictions"
+            PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -c \
+              "DELETE FROM predictions_tft WHERE correlation_id = '$TEST_CID';
+               DELETE FROM audit_events WHERE correlation_id = '$TEST_CID';"
+            exit 1
+          fi
+          echo "PASS: replay detects duplicate prediction rows"
+
+          # Cleanup
+          PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -A -t -c "
+            DELETE FROM predictions_tft WHERE correlation_id = '$TEST_CID';
+            DELETE FROM audit_events WHERE correlation_id = '$TEST_CID';
+          "
+          echo "::endgroup::"
+
+          # --- 3. Missing prediction row must be detected ---
+          echo "::group::Guard: missing prediction detected"
+          MISS_CID="ci-miss-$(uuidgen)"
+          MISS_IKEY="ci-miss-ikey-$$"
+
+          # Insert audit event with NO matching predictions_tft row
+          PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -A -t -c "
+            INSERT INTO audit_events
+              (event_id, correlation_id, idempotency_key, symbol,
+               ts, schema_version, source, event_type, payload)
+            VALUES
+              ('$(uuidgen)', '$MISS_CID', '$MISS_IKEY', 'CITEST',
+               '$TS1', 1, 'ci_guard', 'predictions.tft',
+               '{\"direction\":\"long\",\"confidence\":0.8,\"q10\":-0.01,\"q50\":0.02,\"q90\":0.05,\"model_version\":\"v-ci\",\"event_id\":\"x\",\"correlation_id\":\"$MISS_CID\",\"idempotency_key\":\"$MISS_IKEY\",\"symbol\":\"CITEST\"}')
+            ON CONFLICT DO NOTHING;
+          "
+
+          # Replay must fail (missing prediction row)
+          if python scripts/replay_pipeline.py \
+              --correlation-id "$MISS_CID" --json-report 2>/dev/null; then
+            echo "::error::Replay should have failed on missing prediction row"
+            PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -c \
+              "DELETE FROM audit_events WHERE correlation_id = '$MISS_CID';"
+            exit 1
+          fi
+          echo "PASS: replay detects missing prediction rows"
+
+          # Cleanup
+          PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -A -t -c "
+            DELETE FROM audit_events WHERE correlation_id = '$MISS_CID';
+          "
+          echo "::endgroup::"
+
+          # --- 4. UNIQUE index must exist ---
+          echo "::group::Guard: UNIQUE index exists"
+          IDX_COUNT=$(PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -A -t -c "
+            SELECT count(*)
+            FROM pg_indexes
+            WHERE tablename = 'predictions_tft'
+              AND indexdef ILIKE '%UNIQUE%'
+              AND indexdef ILIKE '%correlation_id%'
+              AND indexdef ILIKE '%idempotency_key%';
+          ")
+          IDX_COUNT=$(echo "$IDX_COUNT" | tr -d '[:space:]')
+          if [ "$IDX_COUNT" -lt 1 ]; then
+            echo "::error::Missing UNIQUE index on predictions_tft (correlation_id, idempotency_key). Run 005_unique_prediction_per_run.sql"
+            exit 1
+          fi
+          echo "PASS: UNIQUE index on (correlation_id, idempotency_key) exists ($IDX_COUNT)"
+          echo "::endgroup::"
+
+      - name: Validate replay cryptographic hashes
+        run: |
+          set -euo pipefail
+
+          # Retrieve the latest synthetic_demo correlation_id.
+          CID=$(PGPASSWORD=awet psql -h localhost -p 5433 -U awet -d awet -A -t -c "
+            SELECT correlation_id
+            FROM audit_events
+            WHERE source = 'synthetic_demo'
+            ORDER BY created_at DESC
+            LIMIT 1
+          ")
+
+          if [ -z "$CID" ]; then
+            echo "::warning::No synthetic_demo CID found — skipping hash check"
+            exit 0
+          fi
+
+          OUTPUT=$(python scripts/replay_pipeline.py \
+            --correlation-id "$CID" --json-report 2>/dev/null)
+
+          # Validate stage_hashes present in stage_summary
+          python -c "
+          import json, sys, re
+          report = json.loads('''$OUTPUT''')
+          HEX64 = re.compile(r'^[a-f0-9]{64}$')
+          found = 0
+          for stage, info in report.get('stage_summary', {}).items():
+              hashes = info.get('stage_hashes', [])
+              for h in hashes:
+                  assert 'audit_hash' in h, f'{stage}: missing audit_hash'
+                  assert 'db_hash' in h, f'{stage}: missing db_hash'
+                  assert 'match' in h, f'{stage}: missing match flag'
+                  assert HEX64.match(h['audit_hash']), f'{stage}: bad audit_hash format'
+                  assert HEX64.match(h['db_hash']), f'{stage}: bad db_hash format'
+                  found += 1
+          assert found > 0, 'No stage_hashes entries found in replay JSON'
+          print(f'PASS: {found} stage_hashes entries validated (64-char hex SHA-256)')
+          "
+
       - name: Cleanup
         if: always()
         run: docker compose down -v

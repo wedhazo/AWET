@@ -60,12 +60,11 @@ async def test_wait_for_trade_polls_until_filled():
         calls["count"] += 1
 
     class DummyConn:
-        def __init__(self):
-            self.calls = 0
+        _shared_calls = 0
 
         async def fetchrow(self, *args, **kwargs):
-            self.calls += 1
-            if self.calls < 2:
+            DummyConn._shared_calls += 1
+            if DummyConn._shared_calls < 2:
                 return None
             return {
                 "alpaca_order_id": "order-1",
@@ -76,6 +75,8 @@ async def test_wait_for_trade_polls_until_filled():
 
         async def close(self):
             return None
+
+    DummyConn._shared_calls = 0
 
     async def fake_connect():
         return DummyConn()
